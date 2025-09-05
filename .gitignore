@@ -1,0 +1,316 @@
+# 操作系统相关
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*~
+
+# 编辑器相关
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+.classpath
+
+# Python相关
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# 虚拟环境
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+.env/
+
+# 环境变量文件
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 数据库相关
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# 日志文件
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# 运行时数据
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# 覆盖率目录
+coverage/
+*.lcov
+.nyc_output
+
+# 依赖目录
+node_modules/
+jspm_packages/
+
+# TypeScript相关
+*.tsbuildinfo
+
+# 可选npm缓存目录
+.npm
+
+# 可选eslint缓存
+.eslintcache
+
+# 可选stylelint缓存
+.stylelintcache
+
+# Microbundle缓存
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# 可选REPL历史
+.node_repl_history
+
+# 输出目录
+dist/
+build/
+out/
+
+# 临时文件
+tmp/
+temp/
+.tmp/
+.temp/
+
+# 缓存目录
+.cache/
+.parcel-cache/
+
+# 测试相关
+coverage/
+.nyc_output/
+.coverage
+.pytest_cache/
+htmlcov/
+
+# 文档生成
+docs/_build/
+
+# 备份文件
+*.bak
+*.backup
+*.old
+*.orig
+
+# 压缩文件
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# 配置文件（包含敏感信息）
+config.ini
+config.json
+secrets.json
+.secrets
+
+# 数据库迁移（开发环境）
+migrations/versions/*.py
+!migrations/versions/.gitkeep
+
+# 静态文件（如果使用CDN）
+static/uploads/
+media/uploads/
+
+# 前端构建产物
+frontpoint/dist/
+frontpoint/build/
+
+# 后端构建产物
+endpoint/dist/
+endpoint/build/
+
+# Docker相关
+.dockerignore
+docker-compose.override.yml
+
+# 监控和性能分析
+*.prof
+*.trace
+
+# 系统相关
+*.pid
+*.sock
+*.lock
+
+# 其他
+*.tgz
+*.tar
+*.gz
+
+# 量化交易系统特定文件
+# 后端 (endpoint/) 特定忽略
+endpoint/.env
+endpoint/.env.*
+endpoint/logs/*.log
+endpoint/instance/
+endpoint/migrations/versions/*.py
+!endpoint/migrations/versions/.gitkeep
+endpoint/data/
+endpoint/uploads/
+endpoint/*.db
+endpoint/*.sqlite*
+
+# 前端 (frontpoint/) 特定忽略
+frontpoint/.env
+frontpoint/.env.*
+frontpoint/dist/
+frontpoint/build/
+frontpoint/node_modules/
+frontpoint/.vite/
+frontpoint/.nuxt/
+frontpoint/.output/
+frontpoint/.vercel/
+frontpoint/.netlify/
+
+# Vite 相关
+frontpoint/vite.config.ts.timestamp-*
+frontpoint/vite.config.js.timestamp-*
+
+# Vue 相关
+frontpoint/src/**/*.vue.d.ts
+
+# 自动生成的文件
+frontpoint/auto-imports.d.ts
+frontpoint/components.d.ts
+
+# 测试相关
+frontpoint/coverage/
+frontpoint/.nyc_output/
+frontpoint/test-results/
+frontpoint/playwright-report/
+frontpoint/playwright/.cache/
+
+# 包管理器锁文件 (根据团队偏好选择保留或忽略)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# IDE和编辑器特定文件
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+.vscode/*.code-workspace
+
+# PyCharm
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/usage.statistics.xml
+.idea/dictionaries/
+.idea/shelf/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb
+
+# 机器学习和数据科学相关
+*.pkl
+*.pickle
+*.joblib
+*.h5
+*.hdf5
+*.npy
+*.npz
+datasets/
+data/raw/
+data/processed/
+models/saved/
+checkpoints/
+
+# 交易相关数据文件
+*.csv
+*.xlsx
+*.json
+!**/config.json
+!**/package.json
+!**/tsconfig.json
+!**/vite.config.ts
+!**/vitest.config.ts
+!**/eslint.config.js
+
+# 证书和密钥文件
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# 系统和运行时文件
+*.pid
+*.sock
+*.lock
+.DS_Store
+Thumbs.db
+
+# 临时文件和备份
+*.tmp
+*.temp
+*.bak
+*.backup
+*.swp
+*.swo
+*~
+
+# 压缩文件
+*.zip
+*.rar
+*.7z
+*.tar.gz
+*.tar.bz2
+
+# 文档生成
+docs/_build/
+docs/.doctrees/
+
+# 其他工具
+.mypy_cache/
+.dmypy.json
+dmypy.json

@@ -1,0 +1,134 @@
+# 依赖目录
+node_modules/
+jspm_packages/
+
+# 构建产物
+dist/
+build/
+out/
+
+# 测试覆盖率报告
+coverage/
+.nyc_output/
+
+# 缓存目录
+.cache/
+.parcel-cache/
+.vite/
+
+# 环境变量文件
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 日志文件
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# 运行时数据
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# 可选npm缓存目录
+.npm
+
+# 可选eslint缓存
+.eslintcache
+
+# 可选stylelint缓存
+.stylelintcache
+
+# Microbundle缓存
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# 可选REPL历史
+.node_repl_history
+
+# 输出目录
+dist/
+build/
+out/
+
+# 临时文件
+tmp/
+temp/
+.tmp/
+.temp/
+
+# 操作系统相关
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*~
+
+# 编辑器相关
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+.classpath
+
+# TypeScript相关
+*.tsbuildinfo
+
+# 自动生成的类型定义文件
+auto-imports.d.ts
+components.d.ts
+
+# 备份文件
+*.bak
+*.backup
+*.old
+*.orig
+
+# 压缩文件
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# 配置文件（包含敏感信息）
+config.ini
+config.json
+secrets.json
+.secrets
+
+# 静态文件（如果使用CDN）
+static/uploads/
+media/uploads/
+
+# Docker相关
+.dockerignore
+docker-compose.override.yml
+
+# 监控和性能分析
+*.prof
+*.trace
+
+# 系统相关
+*.pid
+*.sock
+*.lock
+
+# 其他
+*.tgz
+*.tar
+*.gz
