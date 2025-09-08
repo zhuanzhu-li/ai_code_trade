@@ -254,6 +254,76 @@ class ApiClient {
       url: '/dashboard/stats'
     })
   }
+
+  // 市场数据相关
+  async getDataSources(): Promise<any> {
+    return this.request({
+      method: 'GET',
+      url: '/market-data/sources'
+    })
+  }
+
+  async syncSymbols(data: any): Promise<any> {
+    return this.request({
+      method: 'POST',
+      url: '/market-data/sync/symbols',
+      data
+    })
+  }
+
+  async syncIndexComponents(data: any): Promise<any> {
+    return this.request({
+      method: 'POST',
+      url: '/market-data/sync/index-components',
+      data
+    })
+  }
+
+  async fetchLatestData(data?: any): Promise<any> {
+    return this.request({
+      method: 'POST',
+      url: '/market-data/fetch/latest',
+      data
+    })
+  }
+
+  async fetchHistoricalData(data: any): Promise<any> {
+    return this.request({
+      method: 'POST',
+      url: '/market-data/fetch/historical',
+      data
+    })
+  }
+
+  async getMarketData(symbol: string, params?: any): Promise<any> {
+    return this.request({
+      method: 'GET',
+      url: `/market-data/${symbol}`,
+      params
+    })
+  }
+
+  async getSymbols(params?: any): Promise<any> {
+    return this.request({
+      method: 'GET',
+      url: '/market-data/symbols',
+      params
+    })
+  }
+
+  async getMarketDataStatistics(): Promise<any> {
+    return this.request({
+      method: 'GET',
+      url: '/market-data/statistics'
+    })
+  }
+
+  async getMarketDataHealth(): Promise<any> {
+    return this.request({
+      method: 'GET',
+      url: '/market-data/health'
+    })
+  }
 }
 
 export const apiClient = new ApiClient()

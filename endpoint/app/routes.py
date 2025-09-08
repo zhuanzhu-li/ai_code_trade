@@ -1,8 +1,10 @@
 from flask import Blueprint, request, jsonify
-from models import db, User, Portfolio, Strategy, Trade, MarketData, RiskRule
+from models import db, User, Portfolio, Strategy, Trade, MarketData, RiskRule, Symbol
 # 延迟导入以避免循环导入
 from utils.auth import token_required
+from services.market_data_service import MarketDataService
 import json
+from datetime import datetime, date
 
 # API蓝图
 api_bp = Blueprint('api', __name__)
@@ -502,3 +504,275 @@ def bad_request(error):
 @api_bp.errorhandler(401)
 def unauthorized(error):
     return jsonify({'error': '未授权访问', 'code': 'UNAUTHORIZED'}), 401
+
+# =====================================================
+# 市场数据相关API
+# =====================================================
+
+@api_bp.route('/market-data/sources', methods=['GET'])
+@token_required
+def get_data_sources(current_user):
+    """获取可用的数据源列表"""
+    try:
+        from services.data_sources import list_available_sources
+        
+        sources = list_available_sources()
+        return jsonify({
+            'sources': sources,
+            'default': 'akshare'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'获取数据源失败: {str(e)}', 'code': 'DATA_SOURCE_ERROR'}), 500
+
+@api_bp.route('/market-data/sync/symbols', methods=['POST'])
+@token_required
+def sync_symbols(current_user):
+    """同步股票列表"""
+    try:
+        data = request.get_json() or {}
+        market = data.get('market', 'A股')
+        data_source = data.get('data_source', 'akshare')
+        
+        # 初始化市场数据服务
+        market_service = MarketDataService(data_source)
+        
+        if not market_service.initialize_data_source():
+            return jsonify({'error': '数据源初始化失败', 'code': 'DATA_SOURCE_INIT_ERROR'}), 500
+        
+        # 同步股票列表
+        synced_count = market_service.sync_symbols(market)
+        
+        return jsonify({
+            'message': f'股票列表同步完成',
+            'synced_count': synced_count,
+            'market': market,
+            'data_source': data_source
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'同步股票列表失败: {str(e)}', 'code': 'SYNC_ERROR'}), 500
+
+@api_bp.route('/market-data/sync/index-components', methods=['POST'])
+@token_required
+def sync_index_components(current_user):
+    """同步指数成分股"""
+    try:
+        data = request.get_json()
+        
+        if not data or 'index_code' not in data:
+            return jsonify({'error': '缺少指数代码', 'code': 'MISSING_INDEX_CODE'}), 400
+        
+        index_code = data['index_code']
+        data_source = data.get('data_source', 'akshare')
+        
+        # 初始化市场数据服务
+        market_service = MarketDataService(data_source)
+        
+        if not market_service.initialize_data_source():
+            return jsonify({'error': '数据源初始化失败', 'code': 'DATA_SOURCE_INIT_ERROR'}), 500
+        
+        # 同步指数成分股
+        synced_count = market_service.sync_index_components(index_code)
+        
+        return jsonify({
+            'message': f'{index_code}成分股同步完成',
+            'synced_count': synced_count,
+            'index_code': index_code,
+            'data_source': data_source
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'同步指数成分股失败: {str(e)}', 'code': 'SYNC_ERROR'}), 500
+
+@api_bp.route('/market-data/fetch/latest', methods=['POST'])
+@token_required
+def fetch_latest_data(current_user):
+    """手动获取最新行情数据"""
+    try:
+        data = request.get_json() or {}
+        symbols = data.get('symbols', [])
+        data_source = data.get('data_source', 'akshare')
+        
+        # 如果没有指定股票，获取所有活跃股票
+        if not symbols:
+            active_symbols = Symbol.query.filter_by(is_active=True).all()
+            symbols = [s.symbol for s in active_symbols]
+        
+        if not symbols:
+            return jsonify({'error': '没有找到需要更新的股票', 'code': 'NO_SYMBOLS'}), 400
+        
+        # 初始化市场数据服务
+        market_service = MarketDataService(data_source)
+        
+        if not market_service.initialize_data_source():
+            return jsonify({'error': '数据源初始化失败', 'code': 'DATA_SOURCE_INIT_ERROR'}), 500
+        
+        # 批量获取最新数据
+        results = market_service.batch_fetch_latest_data(symbols)
+        
+        total_updated = sum(results.values())
+        successful_symbols = len([k for k, v in results.items() if v > 0])
+        
+        return jsonify({
+            'message': '最新行情数据获取完成',
+            'total_symbols': len(symbols),
+            'successful_symbols': successful_symbols,
+            'total_records': total_updated,
+            'results': results,
+            'data_source': data_source
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'获取最新行情数据失败: {str(e)}', 'code': 'FETCH_ERROR'}), 500
+
+@api_bp.route('/market-data/fetch/historical', methods=['POST'])
+@token_required
+def fetch_historical_data(current_user):
+    """获取指定股票的历史数据"""
+    try:
+        data = request.get_json()
+        
+        if not data or 'symbol' not in data:
+            return jsonify({'error': '缺少股票代码', 'code': 'MISSING_SYMBOL'}), 400
+        
+        symbol = data['symbol']
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        force_update = data.get('force_update', False)
+        data_source = data.get('data_source', 'akshare')
+        
+        # 转换日期格式
+        if start_date:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+        if end_date:
+            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+        
+        # 初始化市场数据服务
+        market_service = MarketDataService(data_source)
+        
+        if not market_service.initialize_data_source():
+            return jsonify({'error': '数据源初始化失败', 'code': 'DATA_SOURCE_INIT_ERROR'}), 500
+        
+        # 获取历史数据
+        count = market_service.fetch_historical_data(
+            symbol, start_date, end_date, force_update
+        )
+        
+        return jsonify({
+            'message': f'{symbol}历史数据获取完成',
+            'symbol': symbol,
+            'records_added': count,
+            'start_date': start_date.isoformat() if start_date else None,
+            'end_date': end_date.isoformat() if end_date else None,
+            'force_update': force_update,
+            'data_source': data_source
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'获取历史数据失败: {str(e)}', 'code': 'FETCH_ERROR'}), 500
+
+@api_bp.route('/market-data/<symbol>', methods=['GET'])
+@token_required
+def get_market_data(current_user, symbol):
+    """获取股票的市场数据"""
+    try:
+        # 获取查询参数
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        limit = request.args.get('limit', type=int)
+        
+        # 转换日期格式
+        if start_date:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+        if end_date:
+            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+        
+        # 初始化市场数据服务
+        market_service = MarketDataService()
+        
+        # 获取市场数据
+        data = market_service.get_market_data(symbol, start_date, end_date, limit)
+        
+        return jsonify({
+            'symbol': symbol,
+            'data': data,
+            'count': len(data)
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'获取市场数据失败: {str(e)}', 'code': 'GET_DATA_ERROR'}), 500
+
+@api_bp.route('/market-data/symbols', methods=['GET'])
+@token_required
+def get_symbols(current_user):
+    """获取股票列表"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        search = request.args.get('search', '')
+        exchange = request.args.get('exchange', '')
+        
+        # 构建查询
+        query = Symbol.query.filter_by(is_active=True)
+        
+        if search:
+            query = query.filter(
+                db.or_(
+                    Symbol.symbol.contains(search),
+                    Symbol.name.contains(search)
+                )
+            )
+        
+        if exchange:
+            query = query.filter_by(exchange=exchange)
+        
+        # 分页
+        pagination = query.paginate(
+            page=page, 
+            per_page=per_page, 
+            error_out=False
+        )
+        
+        symbols = [symbol.to_dict() for symbol in pagination.items]
+        
+        return jsonify({
+            'symbols': symbols,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': pagination.total,
+                'pages': pagination.pages,
+                'has_next': pagination.has_next,
+                'has_prev': pagination.has_prev
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'获取股票列表失败: {str(e)}', 'code': 'GET_SYMBOLS_ERROR'}), 500
+
+@api_bp.route('/market-data/statistics', methods=['GET'])
+@token_required
+def get_market_data_statistics(current_user):
+    """获取市场数据统计信息"""
+    try:
+        market_service = MarketDataService()
+        stats = market_service.get_data_statistics()
+        
+        return jsonify(stats), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'获取统计信息失败: {str(e)}', 'code': 'GET_STATS_ERROR'}), 500
+
+@api_bp.route('/market-data/health', methods=['GET'])
+@token_required
+def market_data_health_check(current_user):
+    """市场数据服务健康检查"""
+    try:
+        market_service = MarketDataService()
+        health_info = market_service.health_check()
+        
+        return jsonify(health_info), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'健康检查失败: {str(e)}', 'code': 'HEALTH_CHECK_ERROR'}), 500

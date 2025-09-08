@@ -64,6 +64,12 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/market-data',
+      name: 'MarketData',
+      component: () => import('@/views/MarketData.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/risk',
       name: 'Risk',
       component: () => import('@/views/Risk.vue'),
