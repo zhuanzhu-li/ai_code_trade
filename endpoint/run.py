@@ -10,8 +10,8 @@ from dotenv import load_dotenv
 
 def main():
     """主函数"""
-    # 加载环境变量
-    load_dotenv()
+    # 加载环境变量 - 指定.env文件路径
+    load_dotenv('.env')
     
     # 获取配置
     config_name = os.environ.get('FLASK_ENV', 'development')

@@ -38,8 +38,10 @@ def register():
     token = generate_token(user.id)
     
     return jsonify({
-        'user': user.to_dict(),
-        'token': token,
+        'data': {
+            'user': user.to_dict(),
+            'token': token
+        },
         'message': '注册成功'
     }), 201
 
@@ -64,8 +66,10 @@ def login():
     token = generate_token(user.id)
     
     return jsonify({
-        'user': user.to_dict(),
-        'token': token,
+        'data': {
+            'user': user.to_dict(),
+            'token': token
+        },
         'message': '登录成功'
     })
 
@@ -104,7 +108,7 @@ def create_user():
 
 @api_bp.route('/users/<int:user_id>', methods=['GET'])
 @token_required
-def get_user(user_id):
+def get_user(current_user_id, user_id):
     """获取用户信息"""
     user = User.query.get_or_404(user_id)
     return jsonify(user.to_dict())
@@ -112,15 +116,15 @@ def get_user(user_id):
 # 投资组合相关API
 @api_bp.route('/portfolios', methods=['GET'])
 @token_required
-def get_portfolios():
+def get_portfolios(current_user_id):
     """获取投资组合列表"""
-    user_id = request.args.get('user_id', type=int)
+    user_id = request.args.get('user_id', type=int) or current_user_id
     portfolios = Portfolio.query.filter_by(user_id=user_id).all()
     return jsonify([p.to_dict() for p in portfolios])
 
 @api_bp.route('/portfolios', methods=['POST'])
 @token_required
-def create_portfolio():
+def create_portfolio(current_user_id):
     """创建投资组合"""
     data = request.get_json()
     
@@ -142,14 +146,14 @@ def create_portfolio():
 
 @api_bp.route('/portfolios/<int:portfolio_id>', methods=['GET'])
 @token_required
-def get_portfolio(portfolio_id):
+def get_portfolio(current_user_id, portfolio_id):
     """获取投资组合详情"""
     portfolio = Portfolio.query.get_or_404(portfolio_id)
     return jsonify(portfolio.to_dict())
 
 @api_bp.route('/portfolios/<int:portfolio_id>/positions', methods=['GET'])
 @token_required
-def get_portfolio_positions(portfolio_id):
+def get_portfolio_positions(current_user_id, portfolio_id):
     """获取投资组合持仓"""
     portfolio = Portfolio.query.get_or_404(portfolio_id)
     positions = portfolio.positions.all()
@@ -158,7 +162,7 @@ def get_portfolio_positions(portfolio_id):
 # 交易相关API
 @api_bp.route('/trades', methods=['GET'])
 @token_required
-def get_trades():
+def get_trades(current_user_id):
     """获取交易记录"""
     portfolio_id = request.args.get('portfolio_id', type=int)
     symbol = request.args.get('symbol')
@@ -166,7 +170,17 @@ def get_trades():
     
     query = Trade.query
     if portfolio_id:
+        # 验证投资组合属于当前用户
+        portfolio = Portfolio.query.get(portfolio_id)
+        if not portfolio or portfolio.user_id != current_user_id:
+            return jsonify({'error': '投资组合不存在或无权限访问', 'code': 'PORTFOLIO_NOT_FOUND'}), 404
         query = query.filter_by(portfolio_id=portfolio_id)
+    else:
+        # 如果没有指定投资组合，只返回当前用户的交易
+        user_portfolios = Portfolio.query.filter_by(user_id=current_user_id).all()
+        portfolio_ids = [p.id for p in user_portfolios]
+        query = query.filter(Trade.portfolio_id.in_(portfolio_ids))
+    
     if symbol:
         query = query.filter_by(symbol=symbol)
     
@@ -175,7 +189,7 @@ def get_trades():
 
 @api_bp.route('/trades', methods=['POST'])
 @token_required
-def create_trade():
+def create_trade(current_user_id):
     """创建交易"""
     data = request.get_json()
     
@@ -200,15 +214,15 @@ def create_trade():
 # 策略相关API
 @api_bp.route('/strategies', methods=['GET'])
 @token_required
-def get_strategies():
+def get_strategies(current_user_id):
     """获取策略列表"""
-    user_id = request.args.get('user_id', type=int)
+    user_id = request.args.get('user_id', type=int) or current_user_id
     strategies = Strategy.query.filter_by(user_id=user_id).all()
     return jsonify([s.to_dict() for s in strategies])
 
 @api_bp.route('/strategies', methods=['POST'])
 @token_required
-def create_strategy():
+def create_strategy(current_user_id):
     """创建策略"""
     data = request.get_json()
     
@@ -232,7 +246,7 @@ def create_strategy():
 
 @api_bp.route('/strategies/<int:strategy_id>/execute', methods=['POST'])
 @token_required
-def execute_strategy(strategy_id):
+def execute_strategy(current_user_id, strategy_id):
     """执行策略"""
     data = request.get_json()
     
@@ -256,24 +270,11 @@ def execute_strategy(strategy_id):
     
     return jsonify(execution.to_dict()), 201
 
-# 市场数据相关API
-@api_bp.route('/market-data/<symbol>', methods=['GET'])
-@token_required
-def get_market_data(symbol):
-    """获取市场数据"""
-    start_date = request.args.get('start_date')
-    end_date = request.args.get('end_date')
-    limit = request.args.get('limit', 1000, type=int)
-    
-    from services.data_service import DataService
-    data_service = DataService()
-    data = data_service.get_market_data(symbol, start_date, end_date, limit)
-    
-    return jsonify(data)
+# 市场数据相关API - 已移动到文件末尾，避免重复定义
 
 @api_bp.route('/market-data/<symbol>/latest', methods=['GET'])
 @token_required
-def get_latest_market_data(symbol):
+def get_latest_market_data(current_user_id, symbol):
     """获取最新市场数据"""
     from services.data_service import DataService
     data_service = DataService()
@@ -284,14 +285,14 @@ def get_latest_market_data(symbol):
 # 风险管理相关API
 @api_bp.route('/risk-rules', methods=['GET'])
 @token_required
-def get_risk_rules():
+def get_risk_rules(current_user_id):
     """获取风险规则列表"""
     rules = RiskRule.query.filter_by(is_active=True).all()
     return jsonify([r.to_dict() for r in rules])
 
 @api_bp.route('/risk-rules', methods=['POST'])
 @token_required
-def create_risk_rule():
+def create_risk_rule(current_user_id):
     """创建风险规则"""
     data = request.get_json()
     
@@ -314,7 +315,7 @@ def create_risk_rule():
 
 @api_bp.route('/risk-alerts', methods=['GET'])
 @token_required
-def get_risk_alerts():
+def get_risk_alerts(current_user_id):
     """获取风险警报"""
     portfolio_id = request.args.get('portfolio_id', type=int)
     is_resolved = request.args.get('is_resolved', type=bool)
@@ -511,7 +512,7 @@ def unauthorized(error):
 
 @api_bp.route('/market-data/sources', methods=['GET'])
 @token_required
-def get_data_sources(current_user):
+def get_data_sources(current_user_id):
     """获取可用的数据源列表"""
     try:
         from services.data_sources import list_available_sources
@@ -527,7 +528,7 @@ def get_data_sources(current_user):
 
 @api_bp.route('/market-data/sync/symbols', methods=['POST'])
 @token_required
-def sync_symbols(current_user):
+def sync_symbols(current_user_id):
     """同步股票列表"""
     try:
         data = request.get_json() or {}
@@ -555,7 +556,7 @@ def sync_symbols(current_user):
 
 @api_bp.route('/market-data/sync/index-components', methods=['POST'])
 @token_required
-def sync_index_components(current_user):
+def sync_index_components(current_user_id):
     """同步指数成分股"""
     try:
         data = request.get_json()
@@ -587,7 +588,7 @@ def sync_index_components(current_user):
 
 @api_bp.route('/market-data/fetch/latest', methods=['POST'])
 @token_required
-def fetch_latest_data(current_user):
+def fetch_latest_data(current_user_id):
     """手动获取最新行情数据"""
     try:
         data = request.get_json() or {}
@@ -628,7 +629,7 @@ def fetch_latest_data(current_user):
 
 @api_bp.route('/market-data/fetch/historical', methods=['POST'])
 @token_required
-def fetch_historical_data(current_user):
+def fetch_historical_data(current_user_id):
     """获取指定股票的历史数据"""
     try:
         data = request.get_json()
@@ -674,7 +675,7 @@ def fetch_historical_data(current_user):
 
 @api_bp.route('/market-data/<symbol>', methods=['GET'])
 @token_required
-def get_market_data(current_user, symbol):
+def get_market_data(current_user_id, symbol):
     """获取股票的市场数据"""
     try:
         # 获取查询参数
@@ -705,7 +706,7 @@ def get_market_data(current_user, symbol):
 
 @api_bp.route('/market-data/symbols', methods=['GET'])
 @token_required
-def get_symbols(current_user):
+def get_symbols(current_user_id):
     """获取股票列表"""
     try:
         page = request.args.get('page', 1, type=int)
@@ -753,7 +754,7 @@ def get_symbols(current_user):
 
 @api_bp.route('/market-data/statistics', methods=['GET'])
 @token_required
-def get_market_data_statistics(current_user):
+def get_market_data_statistics(current_user_id):
     """获取市场数据统计信息"""
     try:
         market_service = MarketDataService()
@@ -766,7 +767,7 @@ def get_market_data_statistics(current_user):
 
 @api_bp.route('/market-data/health', methods=['GET'])
 @token_required
-def market_data_health_check(current_user):
+def market_data_health_check(current_user_id):
     """市场数据服务健康检查"""
     try:
         market_service = MarketDataService()
