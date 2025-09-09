@@ -3,6 +3,7 @@ from flask import request, jsonify
 import jwt
 import os
 from datetime import datetime, timedelta
+from .response import business_error_response, ResponseCode
 
 def token_required(f):
     """JWT token验证装饰器"""
@@ -16,19 +17,19 @@ def token_required(f):
             try:
                 token = auth_header.split(' ')[1]  # Bearer <token>
             except IndexError:
-                return jsonify({'error': 'Token格式错误'}), 401
+                return business_error_response(ResponseCode.UNAUTHORIZED, 'Token格式错误')
         
         if not token:
-            return jsonify({'error': '缺少认证token'}), 401
+            return business_error_response(ResponseCode.UNAUTHORIZED, '缺少认证token')
         
         try:
             # 验证token
             data = jwt.decode(token, os.environ.get('SECRET_KEY', 'dev-secret-key'), algorithms=['HS256'])
             current_user_id = data['user_id']
         except jwt.ExpiredSignatureError:
-            return jsonify({'error': 'Token已过期'}), 401
+            return business_error_response(ResponseCode.UNAUTHORIZED, 'Token已过期')
         except jwt.InvalidTokenError:
-            return jsonify({'error': '无效的token'}), 401
+            return business_error_response(ResponseCode.UNAUTHORIZED, '无效的token')
         
         return f(current_user_id, *args, **kwargs)
     

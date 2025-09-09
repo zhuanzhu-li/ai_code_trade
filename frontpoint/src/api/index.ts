@@ -64,7 +64,16 @@ class ApiClient {
           window.location.href = '/login'
         }
         
-        const message = error.response?.data?.error || error.message || '请求失败'
+        // 处理新的响应格式
+        let message = '请求失败'
+        if (error.response?.data?.msg) {
+          message = error.response.data.msg
+        } else if (error.response?.data?.error) {
+          message = error.response.data.error
+        } else if (error.message) {
+          message = error.message
+        }
+        
         ElMessage.error(message)
         
         return Promise.reject(error)
@@ -76,7 +85,16 @@ class ApiClient {
   private async request<T>(config: AxiosRequestConfig): Promise<T> {
     try {
       const response = await this.instance.request<ApiResponse<T>>(config)
-      return response.data.data as T
+      
+      // 检查响应格式
+      if (response.data.code === 200) {
+        return response.data.data as T
+      } else {
+        // 业务异常或系统异常
+        const error = new Error(response.data.msg || '请求失败')
+        ;(error as any).code = response.data.code
+        throw error
+      }
     } catch (error) {
       throw error
     }

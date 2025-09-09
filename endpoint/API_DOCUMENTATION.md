@@ -4,6 +4,8 @@
 
 量化交易系统提供RESTful API接口，支持用户管理、投资组合管理、交易执行、策略管理、风险管理和市场数据等功能。
 
+**重要说明：** 所有API接口都使用统一的响应格式，具体格式请参考下方的"响应格式"章节。本文档中的接口示例将重点展示`data`字段的内容，完整的响应格式请按照统一格式进行包装。
+
 ## 认证
 
 所有API请求（除用户注册、登录和系统信息外）都需要在请求头中包含JWT token：
@@ -14,32 +16,85 @@ Authorization: Bearer <your-jwt-token>
 
 ## 响应格式
 
-所有API响应都使用JSON格式：
+所有API响应都使用统一的JSON格式：
 
-### 成功响应
+### 统一响应格式
 ```json
 {
-    "data": {...},
-    "message": "操作成功"
+    "code": xxx,    // 状态码，200为成功，10xxx为业务异常，50xxx为系统异常
+    "msg": "xxx",   // 返回信息，code为200时固定为"成功！"，code为其它时返回异常的简述
+    "data": xxx     // 返回的具体数据，异常时返回为空即可
 }
 ```
 
-### 错误响应
+### 成功响应示例
 ```json
 {
-    "error": "错误描述",
-    "code": "ERROR_CODE"
+    "code": 200,
+    "msg": "成功！",
+    "data": {
+        "user": {
+            "id": 1,
+            "username": "testuser",
+            "email": "test@example.com"
+        }
+    }
 }
 ```
 
-## 状态码
+### 业务异常响应示例
+```json
+{
+    "code": 10001,
+    "msg": "缺少必要字段",
+    "data": null
+}
+```
 
+### 系统异常响应示例
+```json
+{
+    "code": 50001,
+    "msg": "内部服务器错误",
+    "data": null
+}
+```
+
+## 状态码规范
+
+### 成功状态码
 - `200` - 成功
-- `201` - 创建成功
-- `400` - 请求参数错误
-- `401` - 未授权
-- `404` - 资源未找到
-- `500` - 服务器内部错误
+
+### 业务异常状态码 (10xxx)
+- `10001` - 缺少必要字段
+- `10002` - 用户名已存在
+- `10003` - 邮箱已存在
+- `10004` - 用户名或密码错误
+- `10005` - 账户已被禁用
+- `10006` - 缺少用户名或密码
+- `10007` - 投资组合不存在或无权限访问
+- `10008` - 缺少指数代码
+- `10009` - 缺少股票代码
+- `10010` - 没有找到需要更新的股票
+- `10011` - 资源未找到
+- `10012` - 请求参数错误
+- `10013` - 未授权访问
+
+### 系统异常状态码 (50xxx)
+- `50001` - 内部服务器错误
+- `50002` - 数据源错误
+- `50003` - 数据源初始化失败
+- `50004` - 数据同步失败
+- `50005` - 数据获取失败
+- `50006` - 获取市场数据失败
+- `50007` - 获取股票列表失败
+- `50008` - 获取统计信息失败
+- `50009` - 健康检查失败
+
+### HTTP状态码
+- `200` - 成功
+- `400` - 业务异常
+- `500` - 系统异常
 
 ## 用户认证 API
 
@@ -58,9 +113,11 @@ Authorization: Bearer <your-jwt-token>
 }
 ```
 
-**响应:**
+**成功响应:**
 ```json
 {
+    "code": 200,
+    "msg": "注册成功",
     "data": {
         "user": {
             "id": 1,
@@ -71,8 +128,16 @@ Authorization: Bearer <your-jwt-token>
             "updated_at": "2024-01-01T00:00:00Z"
         },
         "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
-    },
-    "message": "注册成功"
+    }
+}
+```
+
+**错误响应示例:**
+```json
+{
+    "code": 10001,
+    "msg": "缺少必要字段",
+    "data": null
 }
 ```
 
@@ -90,9 +155,11 @@ Authorization: Bearer <your-jwt-token>
 }
 ```
 
-**响应:**
+**成功响应:**
 ```json
 {
+    "code": 200,
+    "msg": "登录成功",
     "data": {
         "user": {
             "id": 1,
@@ -103,8 +170,16 @@ Authorization: Bearer <your-jwt-token>
             "updated_at": "2024-01-01T00:00:00Z"
         },
         "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
-    },
-    "message": "登录成功"
+    }
+}
+```
+
+**错误响应示例:**
+```json
+{
+    "code": 10004,
+    "msg": "用户名或密码错误",
+    "data": null
 }
 ```
 
@@ -114,15 +189,28 @@ Authorization: Bearer <your-jwt-token>
 
 获取当前登录用户的信息。
 
-**响应:**
+**成功响应:**
 ```json
 {
-    "id": 1,
-    "username": "testuser",
-    "email": "test@example.com",
-    "is_active": true,
-    "created_at": "2024-01-01T00:00:00Z",
-    "updated_at": "2024-01-01T00:00:00Z"
+    "code": 200,
+    "msg": "成功！",
+    "data": {
+        "id": 1,
+        "username": "testuser",
+        "email": "test@example.com",
+        "is_active": true,
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+    }
+}
+```
+
+**错误响应示例:**
+```json
+{
+    "code": 10013,
+    "msg": "未授权访问",
+    "data": null
 }
 ```
 
@@ -1077,8 +1165,160 @@ async function createTrade(token, tradeData) {
 
 ## 更新日志
 
+### v1.1.0 (2024-01-15)
+- **重大更新**: 统一所有API接口的响应格式
+- 新增统一的响应格式规范：`{code, msg, data}`
+- 新增业务异常状态码规范 (10xxx)
+- 新增系统异常状态码规范 (50xxx)
+- 更新所有接口使用统一的错误处理
+- 更新前端API客户端以支持新响应格式
+- 完善API文档，添加完整的接口示例
+
 ### v1.0.0 (2024-01-01)
 - 初始版本发布
 - 支持用户管理、投资组合管理、交易管理、策略管理
 - 支持市场数据获取和风险管理
 - 提供完整的仪表板API
+
+## 完整接口示例
+
+### 用户注册接口完整示例
+
+**请求:**
+```bash
+POST /api/auth/register
+Content-Type: application/json
+
+{
+    "username": "testuser",
+    "email": "test@example.com",
+    "password": "password123"
+}
+```
+
+**成功响应:**
+```json
+{
+    "code": 200,
+    "msg": "注册成功",
+    "data": {
+        "user": {
+            "id": 1,
+            "username": "testuser",
+            "email": "test@example.com",
+            "is_active": true,
+            "created_at": "2024-01-01T00:00:00Z",
+            "updated_at": "2024-01-01T00:00:00Z"
+        },
+        "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+    }
+}
+```
+
+**错误响应:**
+```json
+{
+    "code": 10002,
+    "msg": "用户名已存在",
+    "data": null
+}
+```
+
+### 获取投资组合列表完整示例
+
+**请求:**
+```bash
+GET /api/portfolios
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
+```
+
+**成功响应:**
+```json
+{
+    "code": 200,
+    "msg": "成功！",
+    "data": [
+        {
+            "id": 1,
+            "user_id": 1,
+            "name": "我的投资组合",
+            "description": "主要投资组合",
+            "initial_capital": 10000.0,
+            "current_value": 10500.0,
+            "cash_balance": 500.0,
+            "total_pnl": 500.0,
+            "total_pnl_percentage": 5.0,
+            "is_active": true,
+            "created_at": "2024-01-01T00:00:00Z",
+            "updated_at": "2024-01-01T00:00:00Z"
+        }
+    ]
+}
+```
+
+**错误响应:**
+```json
+{
+    "code": 10013,
+    "msg": "未授权访问",
+    "data": null
+}
+```
+
+### 创建交易完整示例
+
+**请求:**
+```bash
+POST /api/trades
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
+Content-Type: application/json
+
+{
+    "portfolio_id": 1,
+    "symbol": "AAPL",
+    "side": "buy",
+    "quantity": 100,
+    "price": 150.0
+}
+```
+
+**成功响应:**
+```json
+{
+    "code": 200,
+    "msg": "交易创建成功",
+    "data": {
+        "id": 1,
+        "portfolio_id": 1,
+        "symbol": "AAPL",
+        "side": "buy",
+        "quantity": 100,
+        "price": 150.0,
+        "amount": 15000.0,
+        "fee": 15.0,
+        "net_amount": 14985.0,
+        "pnl": 0.0,
+        "status": "completed",
+        "executed_at": "2024-01-01T10:00:00Z",
+        "created_at": "2024-01-01T10:00:00Z"
+    }
+}
+```
+
+**错误响应:**
+```json
+{
+    "code": 10001,
+    "msg": "缺少必要字段",
+    "data": null
+}
+```
+
+## 注意事项
+
+1. **统一响应格式**: 所有接口都使用相同的响应格式，包含`code`、`msg`和`data`字段
+2. **状态码规范**: 成功使用200，业务异常使用10xxx，系统异常使用50xxx
+3. **错误处理**: 前端应根据`code`字段判断请求是否成功
+4. **认证**: 大部分接口需要JWT token认证
+5. **分页**: 列表接口支持分页参数`page`和`per_page`
+6. **时间格式**: 所有时间字段使用ISO 8601格式

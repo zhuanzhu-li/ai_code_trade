@@ -2,6 +2,10 @@ from flask import Blueprint, request, jsonify
 from models import db, User, Portfolio, Strategy, Trade, MarketData, RiskRule, Symbol
 # 延迟导入以避免循环导入
 from utils.auth import token_required
+from utils.response import (
+    success_response, error_response, business_error_response, system_error_response,
+    ResponseCode, ResponseMessage
+)
 from services.market_data_service import MarketDataService
 import json
 from datetime import datetime, date
@@ -16,13 +20,13 @@ def register():
     data = request.get_json()
     
     if not data or not data.get('username') or not data.get('email') or not data.get('password'):
-        return jsonify({'error': '缺少必要字段', 'code': 'MISSING_FIELDS'}), 400
+        return business_error_response(ResponseCode.MISSING_FIELDS)
     
     if User.query.filter_by(username=data['username']).first():
-        return jsonify({'error': '用户名已存在', 'code': 'USERNAME_EXISTS'}), 400
+        return business_error_response(ResponseCode.USERNAME_EXISTS)
     
     if User.query.filter_by(email=data['email']).first():
-        return jsonify({'error': '邮箱已存在', 'code': 'EMAIL_EXISTS'}), 400
+        return business_error_response(ResponseCode.EMAIL_EXISTS)
     
     user = User(
         username=data['username'],
@@ -37,13 +41,10 @@ def register():
     from utils.auth import generate_token
     token = generate_token(user.id)
     
-    return jsonify({
-        'data': {
-            'user': user.to_dict(),
-            'token': token
-        },
-        'message': '注册成功'
-    }), 201
+    return success_response({
+        'user': user.to_dict(),
+        'token': token
+    }, '注册成功')
 
 @api_bp.route('/auth/login', methods=['POST'])
 def login():
@@ -51,34 +52,31 @@ def login():
     data = request.get_json()
     
     if not data or not data.get('username') or not data.get('password'):
-        return jsonify({'error': '缺少用户名或密码', 'code': 'MISSING_CREDENTIALS'}), 400
+        return business_error_response(ResponseCode.MISSING_CREDENTIALS)
     
     user = User.query.filter_by(username=data['username']).first()
     
     if not user or not user.check_password(data['password']):
-        return jsonify({'error': '用户名或密码错误', 'code': 'INVALID_CREDENTIALS'}), 401
+        return business_error_response(ResponseCode.INVALID_CREDENTIALS)
     
     if not user.is_active:
-        return jsonify({'error': '账户已被禁用', 'code': 'ACCOUNT_DISABLED'}), 401
+        return business_error_response(ResponseCode.ACCOUNT_DISABLED)
     
     # 生成JWT token
     from utils.auth import generate_token
     token = generate_token(user.id)
     
-    return jsonify({
-        'data': {
-            'user': user.to_dict(),
-            'token': token
-        },
-        'message': '登录成功'
-    })
+    return success_response({
+        'user': user.to_dict(),
+        'token': token
+    }, '登录成功')
 
 @api_bp.route('/auth/me', methods=['GET'])
 @token_required
 def get_current_user(current_user_id):
     """获取当前用户信息"""
     user = User.query.get_or_404(current_user_id)
-    return jsonify(user.to_dict())
+    return success_response(user.to_dict())
 
 # 用户管理API
 @api_bp.route('/users', methods=['POST'])
@@ -87,13 +85,13 @@ def create_user():
     data = request.get_json()
     
     if not data or not data.get('username') or not data.get('email') or not data.get('password'):
-        return jsonify({'error': '缺少必要字段', 'code': 'MISSING_FIELDS'}), 400
+        return business_error_response(ResponseCode.MISSING_FIELDS)
     
     if User.query.filter_by(username=data['username']).first():
-        return jsonify({'error': '用户名已存在', 'code': 'USERNAME_EXISTS'}), 400
+        return business_error_response(ResponseCode.USERNAME_EXISTS)
     
     if User.query.filter_by(email=data['email']).first():
-        return jsonify({'error': '邮箱已存在', 'code': 'EMAIL_EXISTS'}), 400
+        return business_error_response(ResponseCode.EMAIL_EXISTS)
     
     user = User(
         username=data['username'],
@@ -104,14 +102,14 @@ def create_user():
     db.session.add(user)
     db.session.commit()
     
-    return jsonify(user.to_dict()), 201
+    return success_response(user.to_dict(), '用户创建成功')
 
 @api_bp.route('/users/<int:user_id>', methods=['GET'])
 @token_required
 def get_user(current_user_id, user_id):
     """获取用户信息"""
     user = User.query.get_or_404(user_id)
-    return jsonify(user.to_dict())
+    return success_response(user.to_dict())
 
 # 投资组合相关API
 @api_bp.route('/portfolios', methods=['GET'])
@@ -120,7 +118,7 @@ def get_portfolios(current_user_id):
     """获取投资组合列表"""
     user_id = request.args.get('user_id', type=int) or current_user_id
     portfolios = Portfolio.query.filter_by(user_id=user_id).all()
-    return jsonify([p.to_dict() for p in portfolios])
+    return success_response([p.to_dict() for p in portfolios])
 
 @api_bp.route('/portfolios', methods=['POST'])
 @token_required
@@ -129,7 +127,7 @@ def create_portfolio(current_user_id):
     data = request.get_json()
     
     if not data or not data.get('name') or not data.get('user_id'):
-        return jsonify({'error': '缺少必要字段'}), 400
+        return business_error_response(ResponseCode.MISSING_FIELDS)
     
     portfolio = Portfolio(
         name=data['name'],
@@ -142,14 +140,14 @@ def create_portfolio(current_user_id):
     db.session.add(portfolio)
     db.session.commit()
     
-    return jsonify(portfolio.to_dict()), 201
+    return success_response(portfolio.to_dict(), '投资组合创建成功')
 
 @api_bp.route('/portfolios/<int:portfolio_id>', methods=['GET'])
 @token_required
 def get_portfolio(current_user_id, portfolio_id):
     """获取投资组合详情"""
     portfolio = Portfolio.query.get_or_404(portfolio_id)
-    return jsonify(portfolio.to_dict())
+    return success_response(portfolio.to_dict())
 
 @api_bp.route('/portfolios/<int:portfolio_id>/positions', methods=['GET'])
 @token_required
@@ -157,7 +155,7 @@ def get_portfolio_positions(current_user_id, portfolio_id):
     """获取投资组合持仓"""
     portfolio = Portfolio.query.get_or_404(portfolio_id)
     positions = portfolio.positions.all()
-    return jsonify([p.to_dict() for p in positions])
+    return success_response([p.to_dict() for p in positions])
 
 # 交易相关API
 @api_bp.route('/trades', methods=['GET'])
@@ -173,7 +171,7 @@ def get_trades(current_user_id):
         # 验证投资组合属于当前用户
         portfolio = Portfolio.query.get(portfolio_id)
         if not portfolio or portfolio.user_id != current_user_id:
-            return jsonify({'error': '投资组合不存在或无权限访问', 'code': 'PORTFOLIO_NOT_FOUND'}), 404
+            return business_error_response(ResponseCode.PORTFOLIO_NOT_FOUND)
         query = query.filter_by(portfolio_id=portfolio_id)
     else:
         # 如果没有指定投资组合，只返回当前用户的交易
@@ -185,7 +183,7 @@ def get_trades(current_user_id):
         query = query.filter_by(symbol=symbol)
     
     trades = query.order_by(Trade.executed_at.desc()).limit(limit).all()
-    return jsonify([t.to_dict() for t in trades])
+    return success_response([t.to_dict() for t in trades])
 
 @api_bp.route('/trades', methods=['POST'])
 @token_required
@@ -194,7 +192,7 @@ def create_trade(current_user_id):
     data = request.get_json()
     
     if not data or not all(k in data for k in ['portfolio_id', 'symbol', 'side', 'quantity', 'price']):
-        return jsonify({'error': '缺少必要字段'}), 400
+        return business_error_response(ResponseCode.MISSING_FIELDS)
     
     from services.trading_service import TradingService
     trading_service = TradingService()
@@ -207,9 +205,9 @@ def create_trade(current_user_id):
             price=data['price'],
             strategy_execution_id=data.get('strategy_execution_id')
         )
-        return jsonify(trade.to_dict()), 201
+        return success_response(trade.to_dict(), '交易创建成功')
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        return business_error_response(ResponseCode.BAD_REQUEST, str(e))
 
 # 策略相关API
 @api_bp.route('/strategies', methods=['GET'])
@@ -218,7 +216,7 @@ def get_strategies(current_user_id):
     """获取策略列表"""
     user_id = request.args.get('user_id', type=int) or current_user_id
     strategies = Strategy.query.filter_by(user_id=user_id).all()
-    return jsonify([s.to_dict() for s in strategies])
+    return success_response([s.to_dict() for s in strategies])
 
 @api_bp.route('/strategies', methods=['POST'])
 @token_required
@@ -227,7 +225,7 @@ def create_strategy(current_user_id):
     data = request.get_json()
     
     if not data or not all(k in data for k in ['name', 'user_id', 'strategy_type']):
-        return jsonify({'error': '缺少必要字段'}), 400
+        return business_error_response(ResponseCode.MISSING_FIELDS)
     
     strategy = Strategy(
         name=data['name'],
@@ -242,7 +240,7 @@ def create_strategy(current_user_id):
     db.session.add(strategy)
     db.session.commit()
     
-    return jsonify(strategy.to_dict()), 201
+    return success_response(strategy.to_dict(), '策略创建成功')
 
 @api_bp.route('/strategies/<int:strategy_id>/execute', methods=['POST'])
 @token_required
@@ -251,7 +249,7 @@ def execute_strategy(current_user_id, strategy_id):
     data = request.get_json()
     
     if not data or not data.get('portfolio_id'):
-        return jsonify({'error': '缺少必要字段'}), 400
+        return business_error_response(ResponseCode.MISSING_FIELDS)
     
     strategy = Strategy.query.get_or_404(strategy_id)
     
@@ -268,7 +266,7 @@ def execute_strategy(current_user_id, strategy_id):
     db.session.add(execution)
     db.session.commit()
     
-    return jsonify(execution.to_dict()), 201
+    return success_response(execution.to_dict(), '策略执行成功')
 
 # 市场数据相关API - 已移动到文件末尾，避免重复定义
 
@@ -280,7 +278,7 @@ def get_latest_market_data(current_user_id, symbol):
     data_service = DataService()
     data = data_service.get_latest_price(symbol)
     
-    return jsonify(data)
+    return success_response(data)
 
 # 风险管理相关API
 @api_bp.route('/risk-rules', methods=['GET'])
@@ -288,7 +286,7 @@ def get_latest_market_data(current_user_id, symbol):
 def get_risk_rules(current_user_id):
     """获取风险规则列表"""
     rules = RiskRule.query.filter_by(is_active=True).all()
-    return jsonify([r.to_dict() for r in rules])
+    return success_response([r.to_dict() for r in rules])
 
 @api_bp.route('/risk-rules', methods=['POST'])
 @token_required
@@ -297,7 +295,7 @@ def create_risk_rule(current_user_id):
     data = request.get_json()
     
     if not data or not all(k in data for k in ['name', 'rule_type']):
-        return jsonify({'error': '缺少必要字段'}), 400
+        return business_error_response(ResponseCode.MISSING_FIELDS)
     
     rule = RiskRule(
         name=data['name'],
@@ -311,7 +309,7 @@ def create_risk_rule(current_user_id):
     db.session.add(rule)
     db.session.commit()
     
-    return jsonify(rule.to_dict()), 201
+    return success_response(rule.to_dict(), '风险规则创建成功')
 
 @api_bp.route('/risk-alerts', methods=['GET'])
 @token_required
@@ -327,7 +325,7 @@ def get_risk_alerts(current_user_id):
         query = query.filter_by(is_resolved=is_resolved)
     
     alerts = query.all()
-    return jsonify([a.to_dict() for a in alerts])
+    return success_response([a.to_dict() for a in alerts])
 
 # 统计和仪表板API
 @api_bp.route('/dashboard/stats', methods=['GET'])
@@ -354,7 +352,7 @@ def get_dashboard_stats(current_user_id):
     from models.risk_management import RiskAlert
     active_alerts = RiskAlert.query.filter_by(is_resolved=False).count()
     
-    return jsonify({
+    return success_response({
         'total_value': total_value,
         'total_pnl': total_pnl,
         'total_pnl_percentage': total_pnl_percentage,
@@ -395,7 +393,7 @@ def get_performance_data(current_user_id):
             **perf
         })
     
-    return jsonify(performance_data)
+    return success_response(performance_data)
 
 @api_bp.route('/dashboard/positions', methods=['GET'])
 @token_required
@@ -424,7 +422,7 @@ def get_positions_summary(current_user_id):
                 'unrealized_pnl_percentage': (position.get_unrealized_pnl() / (float(position.quantity) * float(position.average_price)) * 100) if position.quantity > 0 else 0
             })
     
-    return jsonify(positions_summary)
+    return success_response(positions_summary)
 
 @api_bp.route('/dashboard/recent-trades', methods=['GET'])
 @token_required
@@ -450,13 +448,13 @@ def get_recent_trades(current_user_id):
     
     # 按时间排序并限制数量
     all_trades.sort(key=lambda x: x['executed_at'], reverse=True)
-    return jsonify(all_trades[:limit])
+    return success_response(all_trades[:limit])
 
 # 健康检查
 @api_bp.route('/health', methods=['GET'])
 def health_check():
     """健康检查接口"""
-    return jsonify({
+    return success_response({
         'status': 'healthy',
         'message': '量化交易系统API服务正常运行',
         'version': '1.0.0'
@@ -466,7 +464,7 @@ def health_check():
 @api_bp.route('/info', methods=['GET'])
 def system_info():
     """系统信息接口"""
-    return jsonify({
+    return success_response({
         'name': '量化交易系统',
         'version': '1.0.0',
         'description': '基于Flask的个人量化交易系统API',
@@ -491,20 +489,20 @@ def system_info():
 # 错误处理
 @api_bp.errorhandler(404)
 def not_found(error):
-    return jsonify({'error': '资源未找到', 'code': 'NOT_FOUND'}), 404
+    return business_error_response(ResponseCode.NOT_FOUND)
 
 @api_bp.errorhandler(500)
 def internal_error(error):
     db.session.rollback()
-    return jsonify({'error': '内部服务器错误', 'code': 'INTERNAL_ERROR'}), 500
+    return system_error_response(ResponseCode.INTERNAL_ERROR)
 
 @api_bp.errorhandler(400)
 def bad_request(error):
-    return jsonify({'error': '请求参数错误', 'code': 'BAD_REQUEST'}), 400
+    return business_error_response(ResponseCode.BAD_REQUEST)
 
 @api_bp.errorhandler(401)
 def unauthorized(error):
-    return jsonify({'error': '未授权访问', 'code': 'UNAUTHORIZED'}), 401
+    return business_error_response(ResponseCode.UNAUTHORIZED)
 
 # =====================================================
 # 市场数据相关API
@@ -518,13 +516,13 @@ def get_data_sources(current_user_id):
         from services.data_sources import list_available_sources
         
         sources = list_available_sources()
-        return jsonify({
+        return success_response({
             'sources': sources,
             'default': 'akshare'
-        }), 200
+        })
         
     except Exception as e:
-        return jsonify({'error': f'获取数据源失败: {str(e)}', 'code': 'DATA_SOURCE_ERROR'}), 500
+        return system_error_response(ResponseCode.DATA_SOURCE_ERROR, f'获取数据源失败: {str(e)}')
 
 @api_bp.route('/market-data/sync/symbols', methods=['POST'])
 @token_required
@@ -539,20 +537,19 @@ def sync_symbols(current_user_id):
         market_service = MarketDataService(data_source)
         
         if not market_service.initialize_data_source():
-            return jsonify({'error': '数据源初始化失败', 'code': 'DATA_SOURCE_INIT_ERROR'}), 500
+            return system_error_response(ResponseCode.DATA_SOURCE_INIT_ERROR)
         
         # 同步股票列表
         synced_count = market_service.sync_symbols(market)
         
-        return jsonify({
-            'message': f'股票列表同步完成',
+        return success_response({
             'synced_count': synced_count,
             'market': market,
             'data_source': data_source
-        }), 200
+        }, f'股票列表同步完成')
         
     except Exception as e:
-        return jsonify({'error': f'同步股票列表失败: {str(e)}', 'code': 'SYNC_ERROR'}), 500
+        return system_error_response(ResponseCode.SYNC_ERROR, f'同步股票列表失败: {str(e)}')
 
 @api_bp.route('/market-data/sync/index-components', methods=['POST'])
 @token_required
@@ -562,7 +559,7 @@ def sync_index_components(current_user_id):
         data = request.get_json()
         
         if not data or 'index_code' not in data:
-            return jsonify({'error': '缺少指数代码', 'code': 'MISSING_INDEX_CODE'}), 400
+            return business_error_response(ResponseCode.MISSING_INDEX_CODE)
         
         index_code = data['index_code']
         data_source = data.get('data_source', 'akshare')
@@ -571,20 +568,19 @@ def sync_index_components(current_user_id):
         market_service = MarketDataService(data_source)
         
         if not market_service.initialize_data_source():
-            return jsonify({'error': '数据源初始化失败', 'code': 'DATA_SOURCE_INIT_ERROR'}), 500
+            return system_error_response(ResponseCode.DATA_SOURCE_INIT_ERROR)
         
         # 同步指数成分股
         synced_count = market_service.sync_index_components(index_code)
         
-        return jsonify({
-            'message': f'{index_code}成分股同步完成',
+        return success_response({
             'synced_count': synced_count,
             'index_code': index_code,
             'data_source': data_source
-        }), 200
+        }, f'{index_code}成分股同步完成')
         
     except Exception as e:
-        return jsonify({'error': f'同步指数成分股失败: {str(e)}', 'code': 'SYNC_ERROR'}), 500
+        return system_error_response(ResponseCode.SYNC_ERROR, f'同步指数成分股失败: {str(e)}')
 
 @api_bp.route('/market-data/fetch/latest', methods=['POST'])
 @token_required
@@ -601,13 +597,13 @@ def fetch_latest_data(current_user_id):
             symbols = [s.symbol for s in active_symbols]
         
         if not symbols:
-            return jsonify({'error': '没有找到需要更新的股票', 'code': 'NO_SYMBOLS'}), 400
+            return business_error_response(ResponseCode.NO_SYMBOLS)
         
         # 初始化市场数据服务
         market_service = MarketDataService(data_source)
         
         if not market_service.initialize_data_source():
-            return jsonify({'error': '数据源初始化失败', 'code': 'DATA_SOURCE_INIT_ERROR'}), 500
+            return system_error_response(ResponseCode.DATA_SOURCE_INIT_ERROR)
         
         # 批量获取最新数据
         results = market_service.batch_fetch_latest_data(symbols)
@@ -615,17 +611,16 @@ def fetch_latest_data(current_user_id):
         total_updated = sum(results.values())
         successful_symbols = len([k for k, v in results.items() if v > 0])
         
-        return jsonify({
-            'message': '最新行情数据获取完成',
+        return success_response({
             'total_symbols': len(symbols),
             'successful_symbols': successful_symbols,
             'total_records': total_updated,
             'results': results,
             'data_source': data_source
-        }), 200
+        }, '最新行情数据获取完成')
         
     except Exception as e:
-        return jsonify({'error': f'获取最新行情数据失败: {str(e)}', 'code': 'FETCH_ERROR'}), 500
+        return system_error_response(ResponseCode.FETCH_ERROR, f'获取最新行情数据失败: {str(e)}')
 
 @api_bp.route('/market-data/fetch/historical', methods=['POST'])
 @token_required
@@ -635,7 +630,7 @@ def fetch_historical_data(current_user_id):
         data = request.get_json()
         
         if not data or 'symbol' not in data:
-            return jsonify({'error': '缺少股票代码', 'code': 'MISSING_SYMBOL'}), 400
+            return business_error_response(ResponseCode.MISSING_SYMBOL)
         
         symbol = data['symbol']
         start_date = data.get('start_date')
@@ -653,25 +648,24 @@ def fetch_historical_data(current_user_id):
         market_service = MarketDataService(data_source)
         
         if not market_service.initialize_data_source():
-            return jsonify({'error': '数据源初始化失败', 'code': 'DATA_SOURCE_INIT_ERROR'}), 500
+            return system_error_response(ResponseCode.DATA_SOURCE_INIT_ERROR)
         
         # 获取历史数据
         count = market_service.fetch_historical_data(
             symbol, start_date, end_date, force_update
         )
         
-        return jsonify({
-            'message': f'{symbol}历史数据获取完成',
+        return success_response({
             'symbol': symbol,
             'records_added': count,
             'start_date': start_date.isoformat() if start_date else None,
             'end_date': end_date.isoformat() if end_date else None,
             'force_update': force_update,
             'data_source': data_source
-        }), 200
+        }, f'{symbol}历史数据获取完成')
         
     except Exception as e:
-        return jsonify({'error': f'获取历史数据失败: {str(e)}', 'code': 'FETCH_ERROR'}), 500
+        return system_error_response(ResponseCode.FETCH_ERROR, f'获取历史数据失败: {str(e)}')
 
 @api_bp.route('/market-data/<symbol>', methods=['GET'])
 @token_required
@@ -695,14 +689,14 @@ def get_market_data(current_user_id, symbol):
         # 获取市场数据
         data = market_service.get_market_data(symbol, start_date, end_date, limit)
         
-        return jsonify({
+        return success_response({
             'symbol': symbol,
             'data': data,
             'count': len(data)
-        }), 200
+        })
         
     except Exception as e:
-        return jsonify({'error': f'获取市场数据失败: {str(e)}', 'code': 'GET_DATA_ERROR'}), 500
+        return system_error_response(ResponseCode.GET_DATA_ERROR, f'获取市场数据失败: {str(e)}')
 
 @api_bp.route('/market-data/symbols', methods=['GET'])
 @token_required
@@ -737,7 +731,7 @@ def get_symbols(current_user_id):
         
         symbols = [symbol.to_dict() for symbol in pagination.items]
         
-        return jsonify({
+        return success_response({
             'symbols': symbols,
             'pagination': {
                 'page': page,
@@ -747,10 +741,10 @@ def get_symbols(current_user_id):
                 'has_next': pagination.has_next,
                 'has_prev': pagination.has_prev
             }
-        }), 200
+        })
         
     except Exception as e:
-        return jsonify({'error': f'获取股票列表失败: {str(e)}', 'code': 'GET_SYMBOLS_ERROR'}), 500
+        return system_error_response(ResponseCode.GET_SYMBOLS_ERROR, f'获取股票列表失败: {str(e)}')
 
 @api_bp.route('/market-data/statistics', methods=['GET'])
 @token_required
@@ -760,10 +754,10 @@ def get_market_data_statistics(current_user_id):
         market_service = MarketDataService()
         stats = market_service.get_data_statistics()
         
-        return jsonify(stats), 200
+        return success_response(stats)
         
     except Exception as e:
-        return jsonify({'error': f'获取统计信息失败: {str(e)}', 'code': 'GET_STATS_ERROR'}), 500
+        return system_error_response(ResponseCode.GET_STATS_ERROR, f'获取统计信息失败: {str(e)}')
 
 @api_bp.route('/market-data/health', methods=['GET'])
 @token_required
@@ -773,7 +767,7 @@ def market_data_health_check(current_user_id):
         market_service = MarketDataService()
         health_info = market_service.health_check()
         
-        return jsonify(health_info), 200
+        return success_response(health_info)
         
     except Exception as e:
-        return jsonify({'error': f'健康检查失败: {str(e)}', 'code': 'HEALTH_CHECK_ERROR'}), 500
+        return system_error_response(ResponseCode.HEALTH_CHECK_ERROR, f'健康检查失败: {str(e)}')
