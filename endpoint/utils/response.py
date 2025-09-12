@@ -1,15 +1,14 @@
 """
 统一响应格式工具类
 """
-from flask import jsonify
-from typing import Any, Optional, Dict
+from typing import Any
 
 
 class ResponseCode:
     """响应状态码定义"""
     # 成功
     SUCCESS = 200
-    
+
     # 业务异常 (10xxx)
     MISSING_FIELDS = 10001
     USERNAME_EXISTS = 10002
@@ -26,7 +25,7 @@ class ResponseCode:
     UNAUTHORIZED = 10013
     DATA_SOURCE_EXISTS = 10014
     DATA_SOURCE_IN_USE = 10015
-    
+
     # 系统异常 (50xxx)
     INTERNAL_ERROR = 50001
     DATA_SOURCE_ERROR = 50002
@@ -46,7 +45,7 @@ class ResponseCode:
 class ResponseMessage:
     """响应消息定义"""
     SUCCESS = "成功！"
-    
+
     # 业务异常消息
     MISSING_FIELDS = "缺少必要字段"
     USERNAME_EXISTS = "用户名已存在"
@@ -63,7 +62,7 @@ class ResponseMessage:
     UNAUTHORIZED = "未授权访问"
     DATA_SOURCE_EXISTS = "数据来源名称已存在"
     DATA_SOURCE_IN_USE = "数据来源正在使用中"
-    
+
     # 系统异常消息
     INTERNAL_ERROR = "内部服务器错误"
     DATA_SOURCE_ERROR = "数据源错误"
@@ -82,7 +81,7 @@ class ResponseMessage:
 
 class ApiResponse:
     """统一API响应格式"""
-    
+
     @staticmethod
     def success(data: Any = None, message: str = ResponseMessage.SUCCESS) -> tuple:
         """
@@ -100,8 +99,8 @@ class ApiResponse:
             "msg": message,
             "data": data
         }
-        return jsonify(response), 200
-    
+        return response, 200
+
     @staticmethod
     def error(code: int, message: str, data: Any = None) -> tuple:
         """
@@ -120,7 +119,7 @@ class ApiResponse:
             "msg": message,
             "data": data
         }
-        
+
         # 根据错误码确定HTTP状态码
         if 10000 <= code < 20000:
             http_status = 400  # 业务异常
@@ -128,9 +127,9 @@ class ApiResponse:
             http_status = 500  # 系统异常
         else:
             http_status = 400  # 默认业务异常
-            
-        return jsonify(response), http_status
-    
+
+        return response, http_status
+
     @staticmethod
     def business_error(code: int, message: str = None, data: Any = None) -> tuple:
         """
@@ -147,7 +146,7 @@ class ApiResponse:
         if message is None:
             message = ApiResponse._get_default_message(code)
         return ApiResponse.error(code, message, data)
-    
+
     @staticmethod
     def system_error(code: int, message: str = None, data: Any = None) -> tuple:
         """
@@ -164,7 +163,7 @@ class ApiResponse:
         if message is None:
             message = ApiResponse._get_default_message(code)
         return ApiResponse.error(code, message, data)
-    
+
     @staticmethod
     def _get_default_message(code: int) -> str:
         """获取默认错误消息"""

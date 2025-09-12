@@ -26,15 +26,30 @@ def create_app(config_name=None):
         }
     })
     
-    # 注册API蓝图
-    from app.routes import api_bp
-    app.register_blueprint(api_bp, url_prefix='/api')
+    # 尝试注册API文档蓝图（Flask-RESTX）
+    try:
+        from app.api_docs import api_docs_bp
+        app.register_blueprint(api_docs_bp, url_prefix='/api')
+        
+        # 注册RESTX路由
+        from app.restx_routes import (
+            auth_ns, users_ns, portfolios_ns, trades_ns, strategies_ns,
+            market_data_ns, risk_ns, dashboard_ns, system_ns
+        )
+        print("✅ Flask-RESTX API文档已启用")
+    except ImportError as e:
+        print(f"⚠️  Flask-RESTX未安装，跳过API文档功能: {e}")
+        print("   请运行: pip install flask-restx marshmallow")
     
-    # 根路径重定向到API信息
+    # 注册传统API蓝图（保持向后兼容）
+    from app.routes import api_bp
+    app.register_blueprint(api_bp, url_prefix='/api/legacy')
+    
+    # 根路径重定向到API文档
     @app.route('/')
     def index():
         from flask import redirect, url_for
-        return redirect('/api/info')
+        return redirect('/api/docs/')
     
     # 创建数据库表
     with app.app_context():

@@ -710,7 +710,7 @@ def get_data_source_statistics(current_user_id, data_source_id):
         from sqlalchemy import func
         stats = db.session.query(
             func.count(MarketData.id).label('total_records'),
-            func.count(func.distinct(MarketData.symbol)).label('unique_symbols'),
+            func.count(func.distinct(MarketData.symbol_id)).label('unique_symbols'),
             func.min(MarketData.timestamp).label('earliest_data'),
             func.max(MarketData.timestamp).label('latest_data')
         ).filter_by(data_source_id=data_source_id).first()
@@ -843,7 +843,7 @@ def auto_create_data_sources(current_user_id):
 
 @api_bp.route('/market-data/sources', methods=['GET'])
 @token_required
-def get_data_sources(current_user_id):
+def get_market_data_sources(current_user_id):
     """获取可用的数据源列表"""
     try:
         from services.data_sources import list_available_sources

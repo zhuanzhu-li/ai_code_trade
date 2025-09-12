@@ -43,6 +43,9 @@ def generate_token(user_id):
     }
     
     token = jwt.encode(payload, os.environ.get('SECRET_KEY', 'dev-secret-key'), algorithm='HS256')
+    # 确保返回字符串类型
+    if isinstance(token, bytes):
+        token = token.decode('utf-8')
     return token
 
 def verify_password(password, password_hash):

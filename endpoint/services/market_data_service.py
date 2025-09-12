@@ -219,7 +219,13 @@ class MarketDataService:
             Optional[date]: 最后交易日期
         """
         try:
-            last_record = MarketData.query.filter_by(symbol=symbol)\
+            # 首先查找对应的 Symbol 记录
+            symbol_obj = Symbol.query.filter_by(symbol=symbol).first()
+            if not symbol_obj:
+                return None
+            
+            # 使用 symbol_id 查询最后交易日期
+            last_record = MarketData.query.filter_by(symbol_id=symbol_obj.id)\
                 .order_by(desc(MarketData.timestamp)).first()
             
             if last_record:
@@ -284,6 +290,21 @@ class MarketDataService:
                 logger.warning(f"{symbol}格式化后数据为空")
                 return 0
             
+            # 查找或创建 Symbol 记录
+            symbol_obj = Symbol.query.filter_by(symbol=symbol).first()
+            if not symbol_obj:
+                # 创建新的 Symbol 记录
+                symbol_obj = Symbol(
+                    symbol=symbol,
+                    name=symbol,  # 默认使用symbol作为name
+                    exchange='Unknown',
+                    asset_type='stock',
+                    data_source_id=self.data_source_record.id if self.data_source_record else None
+                )
+                db.session.add(symbol_obj)
+                db.session.commit()
+                logger.info(f"创建新的Symbol记录: {symbol}")
+            
             # 存储到数据库
             stored_count = 0
             
@@ -293,7 +314,7 @@ class MarketDataService:
                     if not force_update:
                         existing = MarketData.query.filter(
                             and_(
-                                MarketData.symbol == symbol,
+                                MarketData.symbol_id == symbol_obj.id,
                                 MarketData.timestamp == data_point['timestamp'],
                                 MarketData.interval_type == data_point['interval_type']
                             )
@@ -304,7 +325,7 @@ class MarketDataService:
                     
                     # 创建新记录
                     market_data = MarketData(
-                        symbol=data_point['symbol'],
+                        symbol_id=symbol_obj.id,
                         data_source_id=self.data_source_record.id if self.data_source_record else None,
                         timestamp=data_point['timestamp'],
                         open_price=data_point['open_price'],
@@ -401,7 +422,14 @@ class MarketDataService:
             List[Dict]: 市场数据列表
         """
         try:
-            query = MarketData.query.filter_by(symbol=symbol)
+            # 首先查找对应的 Symbol 记录
+            symbol_obj = Symbol.query.filter_by(symbol=symbol).first()
+            if not symbol_obj:
+                logger.warning(f"未找到股票代码 {symbol} 对应的记录")
+                return []
+            
+            # 使用 symbol_id 查询市场数据
+            query = MarketData.query.filter_by(symbol_id=symbol_obj.id)
             
             if start_date:
                 query = query.filter(MarketData.timestamp >= start_date)
@@ -450,7 +478,7 @@ class MarketDataService:
                 }
             
             # 获取有数据的股票数量
-            stats['symbols_with_data'] = db.session.query(MarketData.symbol)\
+            stats['symbols_with_data'] = db.session.query(MarketData.symbol_id)\
                 .distinct().count()
             
             return stats

@@ -19,9 +19,6 @@ class Symbol(db.Model):
     # 关联关系
     data_source = db.relationship('DataSource', backref='symbols', lazy='select')
     
-    # 关联关系（通过symbol字段关联，不使用外键）
-    # market_data可以通过symbol字段查询
-    
     def to_dict(self):
         """转换为字典"""
         return {
@@ -45,7 +42,7 @@ class MarketData(db.Model):
     __tablename__ = 'market_data'
     
     id = db.Column(db.Integer, primary_key=True)
-    symbol = db.Column(db.String(20), nullable=False)  # 直接存储股票代码
+    symbol_id = db.Column(db.Integer, db.ForeignKey('symbols.id'), nullable=False)  # 标的ID外键
     data_source_id = db.Column(db.Integer, db.ForeignKey('data_sources.id'), nullable=True)  # 数据来源ID
     timestamp = db.Column(db.DateTime, nullable=False)
     open_price = db.Column(db.Numeric(15, 8), nullable=False)
@@ -57,12 +54,13 @@ class MarketData(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # 关联关系
+    symbol = db.relationship('Symbol', backref='market_data', lazy='select')
     data_source = db.relationship('DataSource', backref='market_data', lazy='select')
     
     # 索引
     __table_args__ = (
-        db.Index('idx_symbol_timestamp_interval', 'symbol', 'timestamp', 'interval_type'),
-        db.Index('idx_symbol', 'symbol'),
+        db.Index('idx_symbol_timestamp_interval', 'symbol_id', 'timestamp', 'interval_type'),
+        db.Index('idx_symbol_id', 'symbol_id'),
         db.Index('idx_timestamp', 'timestamp'),
         db.Index('idx_interval_type', 'interval_type'),
     )
@@ -85,7 +83,9 @@ class MarketData(db.Model):
         """转换为字典"""
         return {
             'id': self.id,
-            'symbol': self.symbol,
+            'symbol_id': self.symbol_id,
+            'symbol': self.symbol.symbol if self.symbol else None,  # 通过关联获取symbol代码
+            'symbol_name': self.symbol.name if self.symbol else None,  # 通过关联获取symbol名称
             'data_source_id': self.data_source_id,
             'data_source': self.data_source.to_dict() if self.data_source else None,
             'timestamp': self.timestamp.isoformat(),
@@ -102,4 +102,5 @@ class MarketData(db.Model):
         }
     
     def __repr__(self):
-        return f'<MarketData {self.symbol} {self.timestamp}>'
+        symbol_code = self.symbol.symbol if self.symbol else f'symbol_id:{self.symbol_id}'
+        return f'<MarketData {symbol_code} {self.timestamp}>'
