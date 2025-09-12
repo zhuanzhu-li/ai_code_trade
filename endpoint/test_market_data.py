@@ -6,7 +6,13 @@
 
 import sys
 import os
+import time
 from datetime import datetime, date, timedelta
+
+from dotenv import load_dotenv
+
+# 加载环境变量 - 必须在导入其他模块之前
+load_dotenv()
 
 # 添加项目路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -77,9 +83,11 @@ def test_market_data_service():
     with app.app_context():
         # 创建数据库表
         db.create_all()
-        
+        # 这里先等待5秒
+        time.sleep(5)
         # 创建市场数据服务实例
         market_service = MarketDataService()
+
         
         # 测试初始化数据源
         print("1. 测试初始化数据源...")

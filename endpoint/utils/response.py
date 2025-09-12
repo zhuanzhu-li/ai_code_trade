@@ -24,6 +24,8 @@ class ResponseCode:
     NOT_FOUND = 10011
     BAD_REQUEST = 10012
     UNAUTHORIZED = 10013
+    DATA_SOURCE_EXISTS = 10014
+    DATA_SOURCE_IN_USE = 10015
     
     # 系统异常 (50xxx)
     INTERNAL_ERROR = 50001
@@ -35,6 +37,10 @@ class ResponseCode:
     GET_SYMBOLS_ERROR = 50007
     GET_STATS_ERROR = 50008
     HEALTH_CHECK_ERROR = 50009
+    CREATE_ERROR = 50010
+    UPDATE_ERROR = 50011
+    DELETE_ERROR = 50012
+    TEST_ERROR = 50013
 
 
 class ResponseMessage:
@@ -55,6 +61,8 @@ class ResponseMessage:
     NOT_FOUND = "资源未找到"
     BAD_REQUEST = "请求参数错误"
     UNAUTHORIZED = "未授权访问"
+    DATA_SOURCE_EXISTS = "数据来源名称已存在"
+    DATA_SOURCE_IN_USE = "数据来源正在使用中"
     
     # 系统异常消息
     INTERNAL_ERROR = "内部服务器错误"
@@ -66,6 +74,10 @@ class ResponseMessage:
     GET_SYMBOLS_ERROR = "获取股票列表失败"
     GET_STATS_ERROR = "获取统计信息失败"
     HEALTH_CHECK_ERROR = "健康检查失败"
+    CREATE_ERROR = "创建失败"
+    UPDATE_ERROR = "更新失败"
+    DELETE_ERROR = "删除失败"
+    TEST_ERROR = "测试失败"
 
 
 class ApiResponse:
@@ -170,6 +182,8 @@ class ApiResponse:
             ResponseCode.NOT_FOUND: ResponseMessage.NOT_FOUND,
             ResponseCode.BAD_REQUEST: ResponseMessage.BAD_REQUEST,
             ResponseCode.UNAUTHORIZED: ResponseMessage.UNAUTHORIZED,
+            ResponseCode.DATA_SOURCE_EXISTS: ResponseMessage.DATA_SOURCE_EXISTS,
+            ResponseCode.DATA_SOURCE_IN_USE: ResponseMessage.DATA_SOURCE_IN_USE,
             ResponseCode.INTERNAL_ERROR: ResponseMessage.INTERNAL_ERROR,
             ResponseCode.DATA_SOURCE_ERROR: ResponseMessage.DATA_SOURCE_ERROR,
             ResponseCode.DATA_SOURCE_INIT_ERROR: ResponseMessage.DATA_SOURCE_INIT_ERROR,
@@ -179,6 +193,10 @@ class ApiResponse:
             ResponseCode.GET_SYMBOLS_ERROR: ResponseMessage.GET_SYMBOLS_ERROR,
             ResponseCode.GET_STATS_ERROR: ResponseMessage.GET_STATS_ERROR,
             ResponseCode.HEALTH_CHECK_ERROR: ResponseMessage.HEALTH_CHECK_ERROR,
+            ResponseCode.CREATE_ERROR: ResponseMessage.CREATE_ERROR,
+            ResponseCode.UPDATE_ERROR: ResponseMessage.UPDATE_ERROR,
+            ResponseCode.DELETE_ERROR: ResponseMessage.DELETE_ERROR,
+            ResponseCode.TEST_ERROR: ResponseMessage.TEST_ERROR,
         }
         return message_map.get(code, "未知错误")
 

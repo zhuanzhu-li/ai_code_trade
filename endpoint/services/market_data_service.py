@@ -9,7 +9,7 @@ from typing import List, Dict, Optional, Tuple
 import pandas as pd
 from sqlalchemy import and_, desc, func
 
-from models import db, MarketData, Symbol
+from models import db, MarketData, Symbol, DataSource
 from services.data_sources import create_data_source, AKShareDataSource
 
 logger = logging.getLogger(__name__)
@@ -28,6 +28,43 @@ class MarketDataService:
         self.data_source_name = data_source_name
         self.data_source = create_data_source(data_source_name, config)
         self.default_start_date = date(2024, 1, 1)
+        
+        # 获取或创建数据来源记录
+        self.data_source_record = self._get_or_create_data_source_record()
+    
+    def _get_or_create_data_source_record(self) -> Optional[DataSource]:
+        """获取或创建数据来源记录"""
+        try:
+            # 首先尝试根据provider_type查找
+            data_source = DataSource.query.filter_by(provider_type=self.data_source_name).first()
+            
+            if not data_source:
+                # 使用数据源的create_data_source_record方法创建记录
+                data_source_info = self.data_source.create_data_source_record()
+                if data_source_info:
+                    # 重新查询获取完整的数据来源对象
+                    data_source = DataSource.query.filter_by(provider_type=self.data_source_name).first()
+                    logger.info(f"使用数据源方法创建数据来源记录: {data_source.name if data_source else 'Unknown'}")
+                else:
+                    logger.warning(f"数据源 {self.data_source_name} 创建记录失败，使用默认方法")
+                    # 如果数据源方法失败，使用默认方法
+                    data_source = DataSource(
+                        name=f"{self.data_source_name.title()}数据源",
+                        uri=f"https://{self.data_source_name}.example.com",
+                        description=f"基于{self.data_source_name}的数据源",
+                        provider_type=self.data_source_name,
+                        is_active=True,
+                        priority=1
+                    )
+                    db.session.add(data_source)
+                    db.session.commit()
+                    logger.info(f"使用默认方法创建数据来源记录: {data_source.name}")
+            
+            return data_source
+            
+        except Exception as e:
+            logger.error(f"获取或创建数据来源记录失败: {e}")
+            return None
     
     def initialize_data_source(self) -> bool:
         """初始化数据源连接"""
@@ -71,6 +108,7 @@ class MarketDataService:
                         symbol.name = stock_info['name']
                         symbol.exchange = stock_info['exchange']
                         symbol.is_active = stock_info.get('is_active', True)
+                        symbol.data_source_id = self.data_source_record.id if self.data_source_record else None
                         symbol.updated_at = datetime.utcnow()
                     else:
                         # 创建新记录
@@ -79,7 +117,8 @@ class MarketDataService:
                             name=stock_info['name'],
                             exchange=stock_info['exchange'],
                             asset_type=stock_info.get('asset_type', 'stock'),
-                            is_active=stock_info.get('is_active', True)
+                            is_active=stock_info.get('is_active', True),
+                            data_source_id=self.data_source_record.id if self.data_source_record else None
                         )
                         db.session.add(symbol)
                     
@@ -139,6 +178,7 @@ class MarketDataService:
                         symbol.name = component['name']
                         symbol.exchange = component['exchange']
                         symbol.is_active = True
+                        symbol.data_source_id = self.data_source_record.id if self.data_source_record else None
                         symbol.updated_at = datetime.utcnow()
                     else:
                         # 创建新记录
@@ -147,7 +187,8 @@ class MarketDataService:
                             name=component['name'],
                             exchange=component['exchange'],
                             asset_type='stock',
-                            is_active=True
+                            is_active=True,
+                            data_source_id=self.data_source_record.id if self.data_source_record else None
                         )
                         db.session.add(symbol)
                     
@@ -264,6 +305,7 @@ class MarketDataService:
                     # 创建新记录
                     market_data = MarketData(
                         symbol=data_point['symbol'],
+                        data_source_id=self.data_source_record.id if self.data_source_record else None,
                         timestamp=data_point['timestamp'],
                         open_price=data_point['open_price'],
                         high_price=data_point['high_price'],
@@ -423,6 +465,7 @@ class MarketDataService:
             health_info = {
                 'service_name': 'MarketDataService',
                 'data_source': self.data_source_name,
+                'data_source_record': self.data_source_record.to_dict() if self.data_source_record else None,
                 'data_source_health': self.data_source.health_check(),
                 'database_stats': self.get_data_statistics(),
                 'last_check': datetime.now().isoformat()

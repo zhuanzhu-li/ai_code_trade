@@ -411,3 +411,46 @@ class AKShareDataSource(BaseDataSource):
         
         base_health['akshare_specific'] = akshare_health
         return base_health
+    
+    def get_data_source_uri(self) -> str:
+        """获取AKShare数据源URI"""
+        return "https://akshare.akfamily.xyz/"
+    
+    def get_data_source_description(self) -> str:
+        """获取AKShare数据源描述"""
+        return "AKShare开源财经数据接口库，提供股票、期货、外汇等数据"
+    
+    def get_data_source_priority(self) -> int:
+        """获取AKShare数据源优先级"""
+        return 1  # 最高优先级
+    
+    def _test_data_access(self) -> Dict[str, any]:
+        """测试AKShare数据访问"""
+        try:
+            # 测试获取少量股票数据
+            df = ak.stock_zh_a_spot_em()
+            if not df.empty:
+                sample_stocks = []
+                for _, row in df.head(3).iterrows():
+                    sample_stocks.append({
+                        'symbol': str(row['代码']),
+                        'name': str(row['名称']),
+                        'price': float(row.get('最新价', 0))
+                    })
+                
+                return {
+                    'stock_count': len(df),
+                    'sample_stocks': sample_stocks,
+                    'api_status': 'accessible'
+                }
+            else:
+                return {
+                    'stock_count': 0,
+                    'sample_stocks': [],
+                    'api_status': 'no_data'
+                }
+        except Exception as e:
+            return {
+                'error': str(e),
+                'api_status': 'error'
+            }

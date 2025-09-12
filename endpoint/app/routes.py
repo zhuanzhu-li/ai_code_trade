@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from models import db, User, Portfolio, Strategy, Trade, MarketData, RiskRule, Symbol
+from models import db, User, Portfolio, Strategy, Trade, MarketData, RiskRule, Symbol, DataSource
 # 延迟导入以避免循环导入
 from utils.auth import token_required
 from utils.response import (
@@ -75,7 +75,9 @@ def login():
 @token_required
 def get_current_user(current_user_id):
     """获取当前用户信息"""
-    user = User.query.get_or_404(current_user_id)
+    user = User.query.get(current_user_id)
+    if not user:
+        return business_error_response(ResponseCode.NOT_FOUND, '用户不存在')
     return success_response(user.to_dict())
 
 # 用户管理API
@@ -108,7 +110,9 @@ def create_user():
 @token_required
 def get_user(current_user_id, user_id):
     """获取用户信息"""
-    user = User.query.get_or_404(user_id)
+    user = User.query.get(user_id)
+    if not user:
+        return business_error_response(ResponseCode.NOT_FOUND, '用户不存在')
     return success_response(user.to_dict())
 
 # 投资组合相关API
@@ -146,14 +150,18 @@ def create_portfolio(current_user_id):
 @token_required
 def get_portfolio(current_user_id, portfolio_id):
     """获取投资组合详情"""
-    portfolio = Portfolio.query.get_or_404(portfolio_id)
+    portfolio = Portfolio.query.get(portfolio_id)
+    if not portfolio:
+        return business_error_response(ResponseCode.NOT_FOUND, '投资组合不存在')
     return success_response(portfolio.to_dict())
 
 @api_bp.route('/portfolios/<int:portfolio_id>/positions', methods=['GET'])
 @token_required
 def get_portfolio_positions(current_user_id, portfolio_id):
     """获取投资组合持仓"""
-    portfolio = Portfolio.query.get_or_404(portfolio_id)
+    portfolio = Portfolio.query.get(portfolio_id)
+    if not portfolio:
+        return business_error_response(ResponseCode.NOT_FOUND, '投资组合不存在')
     positions = portfolio.positions.all()
     return success_response([p.to_dict() for p in positions])
 
@@ -251,7 +259,9 @@ def execute_strategy(current_user_id, strategy_id):
     if not data or not data.get('portfolio_id'):
         return business_error_response(ResponseCode.MISSING_FIELDS)
     
-    strategy = Strategy.query.get_or_404(strategy_id)
+    strategy = Strategy.query.get(strategy_id)
+    if not strategy:
+        return business_error_response(ResponseCode.NOT_FOUND, '策略不存在')
     
     # 创建策略执行记录
     from models.strategy import StrategyExecution
@@ -375,7 +385,10 @@ def get_performance_data(current_user_id):
     from services.trading_service import TradingService
     
     if portfolio_id:
-        portfolios = [Portfolio.query.get_or_404(portfolio_id)]
+        portfolio = Portfolio.query.get(portfolio_id)
+        if not portfolio:
+            return business_error_response(ResponseCode.NOT_FOUND, '投资组合不存在')
+        portfolios = [portfolio]
     else:
         portfolios = Portfolio.query.filter_by(user_id=current_user_id).all()
     
@@ -402,7 +415,10 @@ def get_positions_summary(current_user_id):
     portfolio_id = request.args.get('portfolio_id', type=int)
     
     if portfolio_id:
-        portfolios = [Portfolio.query.get_or_404(portfolio_id)]
+        portfolio = Portfolio.query.get(portfolio_id)
+        if not portfolio:
+            return business_error_response(ResponseCode.NOT_FOUND, '投资组合不存在')
+        portfolios = [portfolio]
     else:
         portfolios = Portfolio.query.filter_by(user_id=current_user_id).all()
     
@@ -432,7 +448,10 @@ def get_recent_trades(current_user_id):
     limit = request.args.get('limit', 10, type=int)
     
     if portfolio_id:
-        portfolios = [Portfolio.query.get_or_404(portfolio_id)]
+        portfolio = Portfolio.query.get(portfolio_id)
+        if not portfolio:
+            return business_error_response(ResponseCode.NOT_FOUND, '投资组合不存在')
+        portfolios = [portfolio]
     else:
         portfolios = Portfolio.query.filter_by(user_id=current_user_id).all()
     
@@ -503,6 +522,320 @@ def bad_request(error):
 @api_bp.errorhandler(401)
 def unauthorized(error):
     return business_error_response(ResponseCode.UNAUTHORIZED)
+
+# =====================================================
+# 数据来源管理API
+# =====================================================
+
+@api_bp.route('/data-sources', methods=['GET'])
+@token_required
+def get_data_sources(current_user_id):
+    """获取数据来源列表"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        provider_type = request.args.get('provider_type', '')
+        is_active = request.args.get('is_active', type=bool)
+        
+        # 构建查询
+        query = DataSource.query
+        
+        if provider_type:
+            query = query.filter_by(provider_type=provider_type)
+        
+        if is_active is not None:
+            query = query.filter_by(is_active=is_active)
+        
+        # 分页
+        pagination = query.paginate(
+            page=page, 
+            per_page=per_page, 
+            error_out=False
+        )
+        
+        data_sources = [ds.to_dict() for ds in pagination.items]
+        
+        return success_response({
+            'data_sources': data_sources,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': pagination.total,
+                'pages': pagination.pages,
+                'has_next': pagination.has_next,
+                'has_prev': pagination.has_prev
+            }
+        })
+        
+    except Exception as e:
+        return system_error_response(ResponseCode.GET_DATA_ERROR, f'获取数据来源列表失败: {str(e)}')
+
+@api_bp.route('/data-sources', methods=['POST'])
+@token_required
+def create_data_source(current_user_id):
+    """创建数据来源"""
+    try:
+        data = request.get_json()
+        
+        if not data or not all(k in data for k in ['name', 'uri', 'provider_type']):
+            return business_error_response(ResponseCode.MISSING_FIELDS)
+        
+        # 检查名称是否已存在
+        if DataSource.query.filter_by(name=data['name']).first():
+            return business_error_response(ResponseCode.DATA_SOURCE_EXISTS)
+        
+        data_source = DataSource(
+            name=data['name'],
+            uri=data['uri'],
+            description=data.get('description', ''),
+            provider_type=data['provider_type'],
+            is_active=data.get('is_active', True),
+            priority=data.get('priority', 1),
+            config=data.get('config', {})
+        )
+        
+        if data.get('config'):
+            data_source.set_config(data['config'])
+        
+        db.session.add(data_source)
+        db.session.commit()
+        
+        return success_response(data_source.to_dict(), '数据来源创建成功')
+        
+    except Exception as e:
+        return system_error_response(ResponseCode.CREATE_ERROR, f'创建数据来源失败: {str(e)}')
+
+@api_bp.route('/data-sources/<int:data_source_id>', methods=['GET'])
+@token_required
+def get_data_source(current_user_id, data_source_id):
+    """获取数据来源详情"""
+    try:
+        data_source = DataSource.query.get(data_source_id)
+        if not data_source:
+            return business_error_response(ResponseCode.NOT_FOUND, '数据来源不存在')
+        return success_response(data_source.to_dict())
+        
+    except Exception as e:
+        return system_error_response(ResponseCode.GET_DATA_ERROR, f'获取数据来源详情失败: {str(e)}')
+
+@api_bp.route('/data-sources/<int:data_source_id>', methods=['PUT'])
+@token_required
+def update_data_source(current_user_id, data_source_id):
+    """更新数据来源"""
+    try:
+        data_source = DataSource.query.get(data_source_id)
+        if not data_source:
+            return business_error_response(ResponseCode.NOT_FOUND, '数据来源不存在')
+        data = request.get_json()
+        
+        if not data:
+            return business_error_response(ResponseCode.MISSING_FIELDS)
+        
+        # 更新字段
+        if 'name' in data:
+            # 检查名称是否与其他数据来源冲突
+            existing = DataSource.query.filter_by(name=data['name']).first()
+            if existing and existing.id != data_source_id:
+                return business_error_response(ResponseCode.DATA_SOURCE_EXISTS)
+            data_source.name = data['name']
+        
+        if 'uri' in data:
+            data_source.uri = data['uri']
+        
+        if 'description' in data:
+            data_source.description = data['description']
+        
+        if 'provider_type' in data:
+            data_source.provider_type = data['provider_type']
+        
+        if 'is_active' in data:
+            data_source.is_active = data['is_active']
+        
+        if 'priority' in data:
+            data_source.priority = data['priority']
+        
+        if 'config' in data:
+            data_source.set_config(data['config'])
+        
+        db.session.commit()
+        
+        return success_response(data_source.to_dict(), '数据来源更新成功')
+        
+    except Exception as e:
+        return system_error_response(ResponseCode.UPDATE_ERROR, f'更新数据来源失败: {str(e)}')
+
+@api_bp.route('/data-sources/<int:data_source_id>', methods=['DELETE'])
+@token_required
+def delete_data_source(current_user_id, data_source_id):
+    """删除数据来源"""
+    try:
+        data_source = DataSource.query.get(data_source_id)
+        if not data_source:
+            return business_error_response(ResponseCode.NOT_FOUND, '数据来源不存在')
+        
+        # 检查是否有关联的symbols或market_data
+        symbol_count = Symbol.query.filter_by(data_source_id=data_source_id).count()
+        market_data_count = MarketData.query.filter_by(data_source_id=data_source_id).count()
+        
+        if symbol_count > 0 or market_data_count > 0:
+            return business_error_response(ResponseCode.DATA_SOURCE_IN_USE, 
+                f'数据来源正在使用中，无法删除。关联的symbols: {symbol_count}, market_data: {market_data_count}')
+        
+        db.session.delete(data_source)
+        db.session.commit()
+        
+        return success_response(None, '数据来源删除成功')
+        
+    except Exception as e:
+        return system_error_response(ResponseCode.DELETE_ERROR, f'删除数据来源失败: {str(e)}')
+
+@api_bp.route('/data-sources/<int:data_source_id>/statistics', methods=['GET'])
+@token_required
+def get_data_source_statistics(current_user_id, data_source_id):
+    """获取数据来源统计信息"""
+    try:
+        data_source = DataSource.query.get(data_source_id)
+        if not data_source:
+            return business_error_response(ResponseCode.NOT_FOUND, '数据来源不存在')
+        
+        # 统计关联的symbols和market_data
+        symbol_count = Symbol.query.filter_by(data_source_id=data_source_id).count()
+        market_data_count = MarketData.query.filter_by(data_source_id=data_source_id).count()
+        
+        # 获取最新的市场数据时间
+        latest_data = MarketData.query.filter_by(data_source_id=data_source_id)\
+            .order_by(MarketData.timestamp.desc()).first()
+        
+        # 获取数据来源性能统计
+        from sqlalchemy import func
+        stats = db.session.query(
+            func.count(MarketData.id).label('total_records'),
+            func.count(func.distinct(MarketData.symbol)).label('unique_symbols'),
+            func.min(MarketData.timestamp).label('earliest_data'),
+            func.max(MarketData.timestamp).label('latest_data')
+        ).filter_by(data_source_id=data_source_id).first()
+        
+        return success_response({
+            'data_source': data_source.to_dict(),
+            'symbol_count': symbol_count,
+            'market_data_count': market_data_count,
+            'latest_data_time': latest_data.timestamp.isoformat() if latest_data else None,
+            'statistics': {
+                'total_records': stats.total_records or 0,
+                'unique_symbols': stats.unique_symbols or 0,
+                'earliest_data': stats.earliest_data.isoformat() if stats.earliest_data else None,
+                'latest_data': stats.latest_data.isoformat() if stats.latest_data else None
+            }
+        })
+        
+    except Exception as e:
+        return system_error_response(ResponseCode.GET_STATS_ERROR, f'获取数据来源统计失败: {str(e)}')
+
+@api_bp.route('/data-sources/test/<int:data_source_id>', methods=['POST'])
+@token_required
+def test_data_source(current_user_id, data_source_id):
+    """测试数据来源连接"""
+    try:
+        data_source = DataSource.query.get(data_source_id)
+        if not data_source:
+            return business_error_response(ResponseCode.NOT_FOUND, '数据来源不存在')
+        
+        # 根据provider_type测试连接
+        if data_source.provider_type == 'akshare':
+            from services.data_sources.akshare_data_source import AkshareDataSource
+            test_source = AkshareDataSource()
+            result = test_source.test_connection()
+        elif data_source.provider_type == 'yahoo':
+            from services.data_sources.yahoo_data_source import YahooDataSource
+            test_source = YahooDataSource()
+            result = test_source.test_connection()
+        elif data_source.provider_type == 'alpha_vantage':
+            from services.data_sources.alpha_vantage_data_source import AlphaVantageDataSource
+            test_source = AlphaVantageDataSource()
+            result = test_source.test_connection()
+        else:
+            # 尝试使用通用方法
+            try:
+                from services.data_sources import create_data_source
+                test_source = create_data_source(data_source.provider_type)
+                result = test_source.test_connection()
+            except Exception as e:
+                result = {'status': 'error', 'message': f'无法创建 {data_source.provider_type} 数据源: {str(e)}'}
+        
+        return success_response({
+            'data_source_id': data_source_id,
+            'provider_type': data_source.provider_type,
+            'test_result': result
+        })
+        
+    except Exception as e:
+        return system_error_response(ResponseCode.TEST_ERROR, f'测试数据来源失败: {str(e)}')
+
+@api_bp.route('/data-sources/auto-create', methods=['POST'])
+@token_required
+def auto_create_data_sources(current_user_id):
+    """自动创建所有支持的数据来源"""
+    try:
+        data = request.get_json() or {}
+        provider_types = data.get('provider_types', ['akshare', 'yahoo', 'alpha_vantage', 'tushare', 'eastmoney'])
+        
+        results = []
+        
+        for provider_type in provider_types:
+            try:
+                # 检查是否已存在
+                existing = DataSource.query.filter_by(provider_type=provider_type).first()
+                if existing:
+                    results.append({
+                        'provider_type': provider_type,
+                        'status': 'exists',
+                        'data_source_id': existing.id,
+                        'message': f'{provider_type} 数据来源已存在'
+                    })
+                    continue
+                
+                # 尝试创建数据源并自动创建记录
+                from services.data_sources import create_data_source
+                data_source = create_data_source(provider_type)
+                
+                if data_source:
+                    # 创建数据来源记录
+                    data_source_info = data_source.create_data_source_record()
+                    if data_source_info:
+                        results.append({
+                            'provider_type': provider_type,
+                            'status': 'created',
+                            'data_source_id': data_source_info['id'],
+                            'message': f'{provider_type} 数据来源创建成功'
+                        })
+                    else:
+                        results.append({
+                            'provider_type': provider_type,
+                            'status': 'failed',
+                            'message': f'{provider_type} 数据来源记录创建失败'
+                        })
+                else:
+                    results.append({
+                        'provider_type': provider_type,
+                        'status': 'unsupported',
+                        'message': f'{provider_type} 数据源不支持'
+                    })
+                    
+            except Exception as e:
+                results.append({
+                    'provider_type': provider_type,
+                    'status': 'error',
+                    'message': f'{provider_type} 创建失败: {str(e)}'
+                })
+        
+        return success_response({
+            'results': results,
+            'total': len(provider_types),
+            'success_count': len([r for r in results if r['status'] in ['created', 'exists']])
+        }, '数据来源自动创建完成')
+        
+    except Exception as e:
+        return system_error_response(ResponseCode.CREATE_ERROR, f'自动创建数据来源失败: {str(e)}')
 
 # =====================================================
 # 市场数据相关API

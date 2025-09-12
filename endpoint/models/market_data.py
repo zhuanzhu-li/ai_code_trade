@@ -11,9 +11,13 @@ class Symbol(db.Model):
     name = db.Column(db.String(100), nullable=False)
     exchange = db.Column(db.String(50))  # 交易所
     asset_type = db.Column(db.String(20), nullable=False, default='stock')  # stock, crypto, forex
+    data_source_id = db.Column(db.Integer, db.ForeignKey('data_sources.id'), nullable=True)  # 数据来源ID
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # 关联关系
+    data_source = db.relationship('DataSource', backref='symbols', lazy='select')
     
     # 关联关系（通过symbol字段关联，不使用外键）
     # market_data可以通过symbol字段查询
@@ -26,6 +30,8 @@ class Symbol(db.Model):
             'name': self.name,
             'exchange': self.exchange,
             'asset_type': self.asset_type,
+            'data_source_id': self.data_source_id,
+            'data_source': self.data_source.to_dict() if self.data_source else None,
             'is_active': self.is_active,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
@@ -40,6 +46,7 @@ class MarketData(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     symbol = db.Column(db.String(20), nullable=False)  # 直接存储股票代码
+    data_source_id = db.Column(db.Integer, db.ForeignKey('data_sources.id'), nullable=True)  # 数据来源ID
     timestamp = db.Column(db.DateTime, nullable=False)
     open_price = db.Column(db.Numeric(15, 8), nullable=False)
     high_price = db.Column(db.Numeric(15, 8), nullable=False)
@@ -48,6 +55,9 @@ class MarketData(db.Model):
     volume = db.Column(db.Numeric(20, 8), nullable=False, default=0)
     interval_type = db.Column(db.String(10), nullable=False, default='1d')  # 时间间隔
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # 关联关系
+    data_source = db.relationship('DataSource', backref='market_data', lazy='select')
     
     # 索引
     __table_args__ = (
@@ -76,6 +86,8 @@ class MarketData(db.Model):
         return {
             'id': self.id,
             'symbol': self.symbol,
+            'data_source_id': self.data_source_id,
+            'data_source': self.data_source.to_dict() if self.data_source else None,
             'timestamp': self.timestamp.isoformat(),
             'open_price': float(self.open_price),
             'high_price': float(self.high_price),

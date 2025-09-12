@@ -418,7 +418,7 @@ class DatabaseMigrator:
         required_tables = [
             'users', 'portfolios', 'positions', 'trades', 'orders',
             'strategies', 'strategy_executions', 'market_data', 'symbols',
-            'risk_rules', 'risk_alerts', 'schema_versions'
+            'risk_rules', 'risk_alerts', 'data_sources', 'schema_versions'
         ]
         
         try:

@@ -178,6 +178,133 @@ class BaseDataSource(ABC):
         # 默认实现，子类可以重写
         return None, None
     
+    def create_data_source_record(self) -> Optional[Dict]:
+        """
+        创建数据来源记录到数据库
+        
+        Returns:
+            Optional[Dict]: 创建的数据来源记录信息，失败时返回None
+        """
+        try:
+            # 延迟导入避免循环导入
+            from models import db, DataSource
+            
+            # 检查是否已存在相同provider_type的数据来源
+            existing = DataSource.query.filter_by(provider_type=self.name.lower()).first()
+            if existing:
+                logger.info(f"数据来源 {self.name} 已存在，ID: {existing.id}")
+                return existing.to_dict()
+            
+            # 创建新的数据来源记录
+            data_source = DataSource(
+                name=f"{self.name}数据源",
+                uri=self.get_data_source_uri(),
+                description=self.get_data_source_description(),
+                provider_type=self.name.lower(),
+                is_active=True,
+                priority=self.get_data_source_priority(),
+                config=self.config
+            )
+            
+            db.session.add(data_source)
+            db.session.commit()
+            
+            logger.info(f"成功创建数据来源记录: {data_source.name} (ID: {data_source.id})")
+            return data_source.to_dict()
+            
+        except Exception as e:
+            logger.error(f"创建数据来源记录失败: {e}")
+            return None
+    
+    def get_data_source_uri(self) -> str:
+        """
+        获取数据来源URI
+        
+        Returns:
+            str: 数据来源URI
+        """
+        # 默认实现，子类可以重写
+        return f"https://{self.name.lower()}.example.com"
+    
+    def get_data_source_description(self) -> str:
+        """
+        获取数据来源描述
+        
+        Returns:
+            str: 数据来源描述
+        """
+        # 默认实现，子类可以重写
+        return f"基于{self.name}的数据源"
+    
+    def get_data_source_priority(self) -> int:
+        """
+        获取数据来源优先级
+        
+        Returns:
+            int: 优先级（数字越小优先级越高）
+        """
+        # 默认实现，子类可以重写
+        return 1
+    
+    def test_connection(self) -> Dict[str, any]:
+        """
+        测试数据源连接
+        
+        Returns:
+            Dict: 测试结果
+        """
+        try:
+            # 尝试连接
+            connected = self.connect()
+            
+            if connected:
+                # 测试获取少量数据
+                test_data = self._test_data_access()
+                return {
+                    'status': 'success',
+                    'message': '连接成功',
+                    'test_data': test_data,
+                    'timestamp': datetime.now().isoformat()
+                }
+            else:
+                return {
+                    'status': 'failed',
+                    'message': '连接失败',
+                    'timestamp': datetime.now().isoformat()
+                }
+                
+        except Exception as e:
+            return {
+                'status': 'error',
+                'message': f'测试连接时出错: {str(e)}',
+                'timestamp': datetime.now().isoformat()
+            }
+        finally:
+            # 确保断开连接
+            try:
+                self.disconnect()
+            except:
+                pass
+    
+    def _test_data_access(self) -> Dict[str, any]:
+        """
+        测试数据访问（子类可以重写）
+        
+        Returns:
+            Dict: 测试数据信息
+        """
+        try:
+            # 默认测试：获取股票列表的前几条
+            stock_list = self.get_stock_list()
+            return {
+                'stock_count': len(stock_list),
+                'sample_stocks': stock_list[:3] if stock_list else []
+            }
+        except Exception as e:
+            return {
+                'error': str(e)
+            }
+
     def health_check(self) -> Dict[str, any]:
         """
         健康检查
